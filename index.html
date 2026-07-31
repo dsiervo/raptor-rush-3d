@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <meta name="theme-color" content="#081b1b" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Raptor Rush 3D</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main id="game-shell" aria-label="Raptor Rush 3D, juego de carrera infinita">
+    <canvas id="game" aria-label="Área del juego"></canvas>
+
+    <section id="hud" class="hidden" aria-live="polite">
+      <div class="hud-card score-card">
+        <span class="hud-label">DISTANCIA</span>
+        <strong id="score">0 m</strong>
+      </div>
+      <div class="hud-card amber-card">
+        <span class="amber-gem" aria-hidden="true"></span>
+        <strong id="amber">0</strong>
+      </div>
+      <button id="pause-btn" class="icon-btn" aria-label="Pausar juego">Ⅱ</button>
+      <div id="speed-meter" aria-label="Velocidad">
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+
+    <div id="combo" aria-live="polite"></div>
+    <div id="swipe-hint" class="hidden" aria-hidden="true">
+      <span>←</span><span>↑</span><span>↓</span><span>→</span>
+    </div>
+
+    <section id="start-screen" class="overlay visible">
+      <div class="logo-lockup">
+        <div class="eyebrow">JUNGLE ESCAPE</div>
+        <h1>RAPTOR<br><em>RUSH</em></h1>
+        <p class="tagline">Corre. Esquiva. Sobrevive.</p>
+      </div>
+
+      <div class="controls-card">
+        <div class="gesture"><b>← →</b><span>cambia de carril</span></div>
+        <div class="gesture"><b>↑</b><span>salta</span></div>
+        <div class="gesture"><b>↓</b><span>agáchate</span></div>
+      </div>
+
+      <button id="start-btn" class="primary-btn">
+        <span>INICIAR CARRERA</span>
+        <small>Toca o desliza para jugar</small>
+      </button>
+      <p class="desktop-tip">También puedes usar las flechas del teclado.</p>
+    </section>
+
+    <section id="pause-screen" class="overlay compact">
+      <div class="panel">
+        <span class="eyebrow">EXPEDICIÓN EN PAUSA</span>
+        <h2>Respira, raptor.</h2>
+        <button id="resume-btn" class="primary-btn"><span>CONTINUAR</span></button>
+        <button id="restart-pause-btn" class="ghost-btn">Reiniciar carrera</button>
+      </div>
+    </section>
+
+    <section id="gameover-screen" class="overlay compact">
+      <div class="panel gameover-panel">
+        <span class="eyebrow danger">FIN DE LA CARRERA</span>
+        <h2 id="result-title">¡Buen intento!</h2>
+        <div class="result-grid">
+          <div><span>Distancia</span><strong id="final-score">0 m</strong></div>
+          <div><span>Ámbar</span><strong id="final-amber">0</strong></div>
+          <div><span>Récord</span><strong id="best-score">0 m</strong></div>
+        </div>
+        <button id="restart-btn" class="primary-btn"><span>CORRER DE NUEVO</span></button>
+        <button id="home-btn" class="ghost-btn">Volver al inicio</button>
+      </div>
+    </section>
+
+    <div id="rotate-notice" aria-hidden="true">
+      <div class="phone-icon">▯</div>
+      <strong>Gira tu teléfono</strong>
+      <span>El juego funciona mejor en vertical.</span>
+    </div>
+
+    <div id="webgl-error" class="overlay compact">
+      <div class="panel">
+        <h2>Este navegador no admite WebGL 2</h2>
+        <p>Abre el juego en una versión reciente de Safari, Chrome o Edge.</p>
+      </div>
+    </div>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>
