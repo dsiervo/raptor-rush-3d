@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -36,3 +36,13 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Record deployed revision
+        if: success()
+        run: |
+          printf '%s\n' "$GITHUB_SHA" > .pages-deployed
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .pages-deployed
+          git diff --cached --quiet || git commit -m "Record successful Pages deployment"
+          git push
