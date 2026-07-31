@@ -22,7 +22,7 @@
 
   if (!gl) {
     ui.error.classList.add('visible');
-    throw new Error('WebGL is not available');
+    return;
   }
 
   // ---------- tiny matrix library (column-major) ----------
