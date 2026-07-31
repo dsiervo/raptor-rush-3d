@@ -1,0 +1,16 @@
+{
+  "name": "Raptor Rush 3D",
+  "short_name": "Raptor Rush",
+  "description": "Juego 3D de carrera infinita protagonizado por un velociraptor.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#07191a",
+  "theme_color": "#081b1b",
+  "orientation": "portrait-primary",
+  "icons": [{
+    "src": "icon.svg",
+    "sizes": "any",
+    "type": "image/svg+xml",
+    "purpose": "any maskable"
+  }]
+}
