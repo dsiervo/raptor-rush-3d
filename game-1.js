@@ -1,4 +1,4 @@
-'use strict';
+  'use strict';
 
   const canvas = document.getElementById('game');
   const gl = canvas.getContext('webgl', {
@@ -13,11 +13,17 @@
   const ui = {
     hud: $('hud'), score: $('score'), amber: $('amber'), combo: $('combo'),
     speedBars: [...document.querySelectorAll('#speed-meter span')],
-    start: $('start-screen'), pause: $('pause-screen'), over: $('gameover-screen'),
+    lives: $('lives'), lifeHearts: [...document.querySelectorAll('#lives span')],
+    goalDistance: $('goal-distance'), goalFill: $('goal-fill'), damage: $('damage-flash'),
+    tutorial: $('tutorial-overlay'), tutorialTitle: $('tutorial-title'),
+    tutorialGesture: $('tutorial-gesture'), tutorialCard: document.querySelector('.tutorial-card'),
+    start: $('start-screen'), pause: $('pause-screen'), over: $('gameover-screen'), win: $('victory-screen'),
     startBtn: $('start-btn'), pauseBtn: $('pause-btn'), resumeBtn: $('resume-btn'),
     restartPauseBtn: $('restart-pause-btn'), restartBtn: $('restart-btn'), homeBtn: $('home-btn'),
+    victoryRestartBtn: $('victory-restart-btn'), victoryHomeBtn: $('victory-home-btn'),
     finalScore: $('final-score'), finalAmber: $('final-amber'), bestScore: $('best-score'),
-    resultTitle: $('result-title'), swipeHint: $('swipe-hint'), error: $('webgl-error')
+    victoryScore: $('victory-score'), victoryAmber: $('victory-amber'), victoryLives: $('victory-lives'),
+    resultTitle: $('result-title'), error: $('webgl-error')
   };
 
   if (!gl) {
@@ -100,7 +106,12 @@
     stone:[0.35,0.38,0.34,1], stoneLight:[0.49,0.52,0.47,1],
     wood:[0.34,0.19,0.09,1], woodLight:[0.51,0.30,0.12,1],
     amber:[1.0,0.55,0.08,1], amberGlow:[1.0,0.62,0.12,.18],
-    shadow:[0.01,0.02,0.02,.28], white:[1,1,1,1], red:[0.9,0.18,0.08,1]
+    shadow:[0.01,0.02,0.02,.28], white:[1,1,1,1], red:[0.9,0.18,0.08,1],
+    sand:[0.66,0.48,0.25,1], sandLight:[0.83,0.66,0.36,1], desertSoil:[0.52,0.34,0.18,1],
+    cactus:[0.20,0.46,0.25,1], cactusLight:[0.34,0.61,0.31,1], bone:[0.88,0.82,0.64,1],
+    trex:[0.43,0.29,0.16,1], trexLight:[0.62,0.42,0.21,1], trexDark:[0.20,0.12,0.07,1],
+    ptero:[0.36,0.26,0.18,1], pteroLight:[0.67,0.47,0.27,1], thorn:[0.25,0.38,0.15,1], mud:[0.16,0.10,0.06,1],
+    skyJungle:[0.47,0.76,0.66,1], skyDesert:[0.93,0.68,0.39,1]
   };
 
   // ---------- shaders ----------
@@ -127,6 +138,7 @@
     uniform vec3 uCamera;
     uniform float uFogNear;
     uniform float uFogFar;
+    uniform vec3 uFogColor;
     void main(){
       vec3 n = normalize(vNormal);
       float diff = max(dot(n, normalize(-uLightDir)), 0.0);
@@ -134,8 +146,7 @@
       vec3 lit = uColor.rgb * (0.52 + diff * 0.58 + rim);
       float d = distance(uCamera, vWorld);
       float fog = smoothstep(uFogNear,uFogFar,d);
-      vec3 fogColor = vec3(.47,.76,.66);
-      gl_FragColor = vec4(mix(lit,fogColor,fog),uColor.a);
+      gl_FragColor = vec4(mix(lit,uFogColor,fog),uColor.a);
     }`;
 
   function compile(type, source) {
@@ -155,7 +166,8 @@
   const U = {
     model: gl.getUniformLocation(program,'uModel'), viewProj: gl.getUniformLocation(program,'uViewProj'),
     color: gl.getUniformLocation(program,'uColor'), light: gl.getUniformLocation(program,'uLightDir'),
-    camera: gl.getUniformLocation(program,'uCamera'), fogNear: gl.getUniformLocation(program,'uFogNear'), fogFar: gl.getUniformLocation(program,'uFogFar')
+    camera: gl.getUniformLocation(program,'uCamera'), fogNear: gl.getUniformLocation(program,'uFogNear'),
+    fogFar: gl.getUniformLocation(program,'uFogFar'), fogColor: gl.getUniformLocation(program,'uFogColor')
   };
 
   gl.enable(gl.DEPTH_TEST);
@@ -167,6 +179,7 @@
   gl.uniform3f(U.light,-.55,-1,.45);
   gl.uniform1f(U.fogNear,35);
   gl.uniform1f(U.fogFar,125);
+  gl.uniform3f(U.fogColor,.47,.76,.66);
 
   // ---------- primitive meshes ----------
   function createMesh(positions, normals, indices) {
