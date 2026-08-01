@@ -39,13 +39,44 @@
     }
   }
 
+  function drawSceneryDetails(){
+    const blend=getDesertBlend();
+    const jungle=1-blend;
+    for(let side=-1;side<=1;side+=2){
+      const x=side*12.5;
+      const rock=mixColor([.20,.30,.24,1],[.57,.31,.15,1],blend);
+      draw(meshes.cube,model([x,3.4,-104],[0,side*.12,side*.02],[3.4,3.5,4.4]),rock);
+      draw(meshes.cube,model([x+side*1.6,6.2,-111],[0,-side*.10,0],[2.1,2.7,3.0]),mixColor(rock,[.72,.43,.22,1],.24));
+      draw(meshes.cube,model([x-side*.8,1.2,-91],[0,side*.2,0],[2.9,1.2,3.2]),mixColor(rock,[.32,.42,.27,1],jungle*.25));
+      if(jungle>.18){
+        for(let i=0;i<4;i++){
+          const a=i*.95+side;
+          draw(meshes.sphere,model([x+Math.sin(a)*2.2,5.8+i*.35,-94-i*4],[0,a,0],[1.25,1.7,.72]),[.12+.08*i,.38+.035*i,.19,.78*jungle]);
+        }
+      }
+    }
+    gl.depthMask(false);
+    draw(meshes.sphere,model([8.8,12.4,-128],[0,0,0],[3.0,3.0,.18]),[1.0,.78,.31,.12+.14*blend]);
+    gl.depthMask(true);
+  }
+
   function drawTree(e){
     const s=e.scale;
-    draw(meshes.cylinder,model([e.x,1.15*s,e.z],[0,e.spin,0],[.42*s,1.25*s,.42*s]),COLORS.trunk);
-    draw(meshes.sphere,model([e.x,3.0*s,e.z],[0,0,0],[1.38*s,1.55*s,1.38*s]),COLORS.leaf);
-    draw(meshes.sphere,model([e.x-.55*s,2.72*s,e.z+.15*s],[0,0,0],[.95*s,1.1*s,.95*s]),COLORS.leaf2);
-    draw(meshes.sphere,model([e.x+.62*s,2.85*s,e.z-.1*s],[0,0,0],[.9*s,1.2*s,.9*s]),COLORS.leaf2);
+    draw(meshes.cylinder,model([e.x,1.35*s,e.z],[0,e.spin,0],[.40*s,1.45*s,.40*s]),COLORS.trunk);
+    for(let i=0;i<3;i++) draw(meshes.cylinder,model([e.x,(.55+i*.72)*s,e.z],[0,e.spin+i*.5,0],[.46*s,.07*s,.46*s]),COLORS.woodLight);
+    const crownY=3.05*s;
+    draw(meshes.sphere,model([e.x,crownY,e.z],[0,0,0],[.58*s,.48*s,.58*s]),COLORS.leaf);
+    for(let i=0;i<8;i++){
+      const a=i/8*Math.PI*2+e.spin;
+      const radius=1.10*s;
+      draw(meshes.sphere,model([e.x+Math.cos(a)*radius,crownY+Math.sin(i*.8)*.16*s,e.z+Math.sin(a)*radius],[.08,-a,a*.12],[1.15*s,.18*s,.46*s]),i%2?COLORS.leaf:COLORS.leaf2);
+    }
+    for(let i=0;i<5;i++){
+      const a=i/5*Math.PI*2-e.spin*.4;
+      draw(meshes.sphere,model([e.x+Math.cos(a)*.62*s,2.45*s,e.z+Math.sin(a)*.62*s],[0,-a,0],[.68*s,.13*s,.28*s]),COLORS.grass);
+    }
   }
+
   function drawEnvRock(e){
     draw(meshes.sphere,model([e.x,.45*e.scale,e.z],[0,e.spin,.08],[1.2*e.scale,.62*e.scale,.92*e.scale]),COLORS.stone);
     if(e.scale>.9) draw(meshes.sphere,model([e.x+.7*e.scale,.22*e.scale,e.z+.25],[0,-e.spin,0],[.55*e.scale,.35*e.scale,.48*e.scale]),COLORS.stoneLight);
@@ -62,30 +93,56 @@
   }
 
   function drawTrexObstacle(x,z,o){
-    const bob=Math.sin(worldTime*4+o.spin)*.07;
-    draw(meshes.sphere,model([x,1.62+bob,z],[0,0,0],[1.10,.82,1.48]),COLORS.trex);
-    draw(meshes.sphere,model([x,2.30+bob,z+1.18],[-.08,0,0],[.78,.62,.92]),COLORS.trexLight);
-    draw(meshes.sphere,model([x,2.12+bob,z+1.86],[.08,0,0],[.62,.36,.82]),COLORS.trexDark);
-    draw(meshes.cylinder,model([x,1.55+bob,z-1.55],[Math.PI/2,0,0],[.44,1.20,.44]),COLORS.trexDark);
-    draw(meshes.cylinder,model([x,1.44+bob,z-2.66],[Math.PI/2,0,0],[.27,.82,.27]),COLORS.trex);
+    const step=Math.sin(worldTime*5.2+o.spin), bob=Math.abs(step)*.07;
+    const dark=[.25,.20,.12,1], base=[.48,.38,.22,1], light=[.68,.53,.30,1];
+    draw(meshes.sphere,model([x,1.74+bob,z-.15],[0,0,0],[1.18,.94,1.62]),base);
+    draw(meshes.sphere,model([x,1.92+bob,z+.70],[-.12,0,0],[.92,.82,1.05]),light);
+    draw(meshes.cylinder,model([x,2.20+bob,z+1.20],[.42,0,0],[.58,.72,.58]),base);
+    draw(meshes.sphere,model([x,2.72+bob,z+1.72],[-.08,0,0],[.86,.66,.90]),base);
+    draw(meshes.sphere,model([x,2.62+bob,z+2.42],[.05,0,0],[.72,.38,.83]),light);
+    draw(meshes.sphere,model([x,2.38+bob,z+2.37],[.18,0,0],[.66,.22,.78]),dark);
+    const tail=[[0,1.72,-1.48,.65,.92],[0,1.68,-2.55,.48,.82],[0,1.62,-3.48,.32,.70],[0,1.56,-4.22,.19,.55]];
+    tail.forEach((t,i)=>draw(meshes.cylinder,model([x+t[0],t[1]+bob,z+t[2]],[Math.PI/2+.04*i,0,0],[t[3],t[4],t[3]]),i%2?dark:base));
     for(const side of [-1,1]){
-      draw(meshes.cylinder,model([x+side*.62,.62,z+.10],[0,0,side*.12],[.26,.70,.26]),COLORS.trexLight);
-      draw(meshes.sphere,model([x+side*.62,.10,z+.36],[0,0,0],[.40,.14,.62]),COLORS.trexDark);
-      draw(meshes.cylinder,model([x+side*.72,1.85+bob,z+.82],[.85,0,side*.28],[.10,.36,.10]),COLORS.trexDark);
-      draw(meshes.sphere,model([x+side*.46,2.53+bob,z+1.68],[0,0,0],[.10,.12,.08]),COLORS.eye);
+      const phase=side===-1?step:-step;
+      draw(meshes.cylinder,model([x+side*.68,.92,z-.10+phase*.20],[phase*.26,0,side*.08],[.34,.72,.34]),light);
+      draw(meshes.cylinder,model([x+side*.70,.31,z+.18-phase*.18],[-phase*.20,0,0],[.25,.55,.25]),base);
+      draw(meshes.sphere,model([x+side*.70,.09,z+.56],[0,0,0],[.46,.16,.70]),dark);
+      for(let c=-1;c<=1;c++) draw(meshes.cone,model([x+side*.70+c*.14,.08,z+1.02],[Math.PI/2,0,0],[.045,.20,.045]),COLORS.tooth);
+      draw(meshes.cylinder,model([x+side*.70,2.02+bob,z+1.15],[.78,0,side*.32],[.10,.34,.10]),dark);
+      draw(meshes.cylinder,model([x+side*.78,1.78+bob,z+1.42],[-.52,0,side*.25],[.075,.24,.075]),base);
+      draw(meshes.sphere,model([x+side*.56,2.94+bob,z+2.24],[0,0,0],[.10,.12,.075]),COLORS.eye);
+      draw(meshes.sphere,model([x+side*.60,2.95+bob,z+2.31],[0,0,0],[.045,.065,.035]),COLORS.pupil);
     }
-    for(let i=-1;i<=1;i++) draw(meshes.cone,model([x+i*.22,1.92+bob,z+2.38],[Math.PI/2,0,0],[.045,.16,.045]),COLORS.tooth);
+    for(const side of [-1,1]) for(let i=0;i<5;i++) draw(meshes.cone,model([x+side*(.12+i*.10),2.43+bob,z+2.84-i*.05],[Math.PI/2,0,0],[.035,.13,.035]),COLORS.tooth);
+    for(let i=0;i<7;i++) draw(meshes.cone,model([x,2.66-i*.10+bob,z+.95-i*.48],[0,0,Math.PI],[.08,.20-i*.012,.08]),dark);
   }
 
+
   function drawPteroObstacle(x,z,o){
-    const flap=Math.sin(worldTime*8+o.spin)*.42;
-    draw(meshes.sphere,model([x,1.62,z],[0,0,0],[.34,.30,.78]),COLORS.pteroLight);
-    draw(meshes.cone,model([x,1.68,z+1.05],[Math.PI/2,0,0],[.18,.62,.18]),COLORS.ptero);
+    const flap=Math.sin(worldTime*8.4+o.spin);
+    const lift=Math.abs(flap)*.22;
+    const body=[.34,.28,.72], skin=[.34,.29,.20,1], light=[.62,.49,.31,1], membrane=[.55,.38,.23,.88];
+    draw(meshes.sphere,model([x,1.72+lift,z],[0,0,0],body),skin);
+    draw(meshes.cylinder,model([x,1.82+lift,z+.72],[Math.PI/2-.18,0,0],[.20,.52,.20]),light);
+    draw(meshes.sphere,model([x,2.02+lift,z+1.17],[0,0,0],[.30,.28,.42]),skin);
+    draw(meshes.cone,model([x,2.00+lift,z+1.82],[Math.PI/2,0,0],[.18,.72,.15]),[.92,.45,.12,1]);
+    draw(meshes.cone,model([x,1.88+lift,z+1.72],[Math.PI/2+.10,0,Math.PI],[.12,.58,.10]),[.68,.27,.10,1]);
+    draw(meshes.cone,model([x,2.40+lift,z+.98],[-Math.PI/2-.15,0,0],[.16,.58,.13]),[.82,.34,.10,1]);
     for(const side of [-1,1]){
-      draw(meshes.cube,model([x+side*1.12,1.74+Math.abs(flap)*.25,z],[0,0,side*(.22+flap)],[1.15,.08,.62]),COLORS.ptero);
-      draw(meshes.cube,model([x+side*2.05,1.80+Math.abs(flap)*.35,z-.12],[0,0,side*(.34+flap*.8)],[.80,.055,.42]),COLORS.pteroLight);
+      const wingAngle=side*(.14-flap*.30);
+      const outerAngle=side*(.22-flap*.46);
+      draw(meshes.cylinder,model([x+side*.83,1.88+lift,z],[0,0,Math.PI/2+wingAngle],[.10,.92,.10]),skin);
+      draw(meshes.cylinder,model([x+side*2.15,1.94+lift+Math.abs(flap)*.18,z-.08],[0,0,Math.PI/2+outerAngle],[.075,1.10,.075]),light);
+      draw(meshes.cube,model([x+side*.92,1.73+lift,z-.12],[0,0,wingAngle],[.93,.055,.64]),membrane);
+      draw(meshes.cube,model([x+side*2.20,1.80+lift+Math.abs(flap)*.18,z-.20],[0,0,outerAngle],[1.15,.045,.50]),[.48,.32,.20,.82]);
+      draw(meshes.cone,model([x+side*3.30,1.88+lift+Math.abs(flap)*.24,z-.25],[0,0,-side*Math.PI/2],[.07,.32,.07]),[.18,.14,.10,1]);
+      draw(meshes.sphere,model([x+side*.22,2.12+lift,z+1.32],[0,0,0],[.065,.075,.055]),COLORS.eye);
+      draw(meshes.sphere,model([x+side*.25,2.13+lift,z+1.38],[0,0,0],[.028,.045,.025]),COLORS.pupil);
     }
+    draw(meshes.cylinder,model([x,1.58+lift,z-.78],[Math.PI/2,0,0],[.16,.48,.16]),skin);
   }
+
 
   function drawObstacle(o){
     const x=lanes[o.lane],z=o.z;
@@ -139,78 +196,49 @@
 
   function drawRaptor(){
     if(player.invulnerable>0&&Math.floor(player.invulnerable*12)%2===0) return;
-    const slideAmt=player.sliding>0 ? Math.min(1,player.sliding*3) : 0;
+    const slideAmt=player.sliding>0?Math.min(1,player.sliding*3):0;
     const bob=player.y>0?0:Math.sin(player.runPhase*2)*.045*(1-slideAmt);
     const root=model([player.x,.02+player.y+bob,2],[0,player.lean*.2,-player.lean],[.80,.80,.80]);
-    const bodyY=.98-.32*slideAmt;
-    const bodyPitch=-.1-.46*slideAmt;
-    const run=Math.sin(player.runPhase), runOpp=Math.sin(player.runPhase+Math.PI);
-    const tailSway=Math.sin(player.runPhase*.45)*.16;
-
-    gl.depthMask(false);
-    draw(meshes.sphere,model([0,.08,0],[0,0,0],[.92,.055,1.25],root),COLORS.shadow);
-    gl.depthMask(true);
-
-    draw(meshes.sphere,model([0,bodyY,0],[bodyPitch,0,0],[.68,.68,1.18],root),COLORS.raptor);
-    draw(meshes.sphere,model([0,bodyY-.16,-.27],[bodyPitch,0,0],[.52,.48,.83],root),COLORS.raptorLight);
-    draw(meshes.sphere,model([0,bodyY+.08,.15],[0,0,0],[.7,.38,.82],root),COLORS.raptorDark);
-
-    // Tail, segmented and animated.
-    const tailParts=[
-      [0,.92,1.02,.42,.40,1.05],
-      [tailSway,.93,2.03,.32,.31,.92],
-      [tailSway*2.2,.95,2.92,.23,.22,.78],
-      [tailSway*3.5,.98,3.68,.13,.13,.61]
-    ];
-    tailParts.forEach((t,i)=>{
-      draw(meshes.cylinder,model([t[0],t[1]-.30*slideAmt,t[2]],[Math.PI/2+tailSway*.2,0,-tailSway*.35],[t[3],t[5],t[4]],root),i%2?COLORS.raptor:COLORS.raptorDark);
-    });
-
-    // Neck and head.
-    draw(meshes.cylinder,model([0,bodyY+.38,-.72],[.48+bodyPitch,0,0],[.38,.55,.38],root),COLORS.raptor);
-    draw(meshes.sphere,model([0,bodyY+.68,-1.18],[bodyPitch*.45,0,0],[.55,.48,.76],root),COLORS.raptor);
-    draw(meshes.sphere,model([0,bodyY+.59,-1.83],[.06+bodyPitch*.3,0,0],[.43,.30,.62],root),COLORS.raptorLight);
-    draw(meshes.sphere,model([0,bodyY+.47,-1.82],[.16+Math.sin(player.runPhase*.5)*.03,0,0],[.39,.17,.58],root),COLORS.raptorDark);
-
-    // Eyes and pupils.
+    const bodyY=.98-.32*slideAmt,pitch=-.10-.46*slideAmt;
+    const run=Math.sin(player.runPhase),opposite=Math.sin(player.runPhase+Math.PI),sway=Math.sin(player.runPhase*.45)*.16;
+    gl.depthMask(false);draw(meshes.sphere,model([0,.08,0],[0,0,0],[.95,.055,1.30],root),COLORS.shadow);gl.depthMask(true);
+    draw(meshes.sphere,model([0,bodyY,0],[pitch,0,0],[.70,.70,1.20],root),COLORS.raptor);
+    draw(meshes.sphere,model([0,bodyY-.18,-.30],[pitch,0,0],[.54,.49,.86],root),COLORS.raptorLight);
+    draw(meshes.sphere,model([0,bodyY+.12,.18],[0,0,0],[.72,.39,.84],root),COLORS.raptorDark);
+    [[0,.92,1.02,.43,1.05],[sway,.93,2.03,.33,.92],[sway*2.2,.95,2.92,.23,.78],[sway*3.5,.98,3.68,.13,.61]].forEach((t,i)=>draw(meshes.cylinder,model([t[0],t[1]-.30*slideAmt,t[2]],[Math.PI/2+sway*.2,0,-sway*.35],[t[3],t[4],t[3]],root),i%2?COLORS.raptor:COLORS.raptorDark));
+    draw(meshes.cylinder,model([0,bodyY+.40,-.73],[.48+pitch,0,0],[.39,.56,.39],root),COLORS.raptor);
+    draw(meshes.sphere,model([0,bodyY+.70,-1.18],[pitch*.45,0,0],[.57,.49,.78],root),COLORS.raptor);
+    draw(meshes.sphere,model([0,bodyY+.62,-1.82],[.05+pitch*.3,0,0],[.45,.31,.64],root),COLORS.raptorLight);
+    draw(meshes.sphere,model([0,bodyY+.47,-1.84],[.18,0,0],[.40,.17,.60],root),COLORS.raptorDark);
+    draw(meshes.sphere,model([0,bodyY+.70,-1.90],[0,0,0],[.30,.11,.42],root),COLORS.raptor);
     for(const side of [-1,1]){
-      draw(meshes.sphere,model([side*.38,bodyY+.86,-1.50],[0,0,0],[.12,.14,.11],root),COLORS.eye);
-      draw(meshes.sphere,model([side*.43,bodyY+.87,-1.58],[0,0,0],[.055,.08,.045],root),COLORS.pupil);
+      draw(meshes.sphere,model([side*.39,bodyY+.88,-1.50],[0,0,0],[.125,.145,.115],root),COLORS.eye);
+      draw(meshes.sphere,model([side*.44,bodyY+.89,-1.59],[0,0,0],[.055,.082,.045],root),COLORS.pupil);
+      draw(meshes.sphere,model([side*.26,bodyY+.98,-1.40],[0,0,side*.18],[.28,.08,.24],root),COLORS.raptorDark);
+      for(let i=0;i<4;i++) draw(meshes.cone,model([side*.25,bodyY+.49,-1.62-i*.16],[0,0,Math.PI],[.032,.095,.032],root),COLORS.tooth);
     }
-    // Teeth.
-    for(const side of [-1,1]) for(let i=0;i<3;i++){
-      draw(meshes.cone,model([side*.25,bodyY+.48,-1.63-i*.18],[0,0,Math.PI],[.035,.10,.035],root),COLORS.tooth);
+    for(let i=0;i<5;i++){
+      draw(meshes.sphere,model([0,bodyY+.57,-.42+i*.32],[0,0,0],[.45-i*.052,.085,.10],root),COLORS.raptorDark);
+      draw(meshes.cone,model([0,bodyY+.72,-.50+i*.42],[0,0,Math.PI],[.055,.18,.055],root),COLORS.raptorDark);
     }
-
-    // Back stripes.
-    for(let i=0;i<4;i++){
-      draw(meshes.sphere,model([0,bodyY+.55,-.35+i*.33],[0,0,0],[.44-i*.055,.09,.10],root),COLORS.raptorDark);
-    }
-
-    // Legs.
     for(const side of [-1,1]){
-      const phase=side===-1?run:runOpp;
-      const hipX=side*.48, hipY=bodyY-.35, hipZ=.15;
-      const thighRot=.20+phase*.63;
-      const kneeZ=hipZ+Math.sin(thighRot)*.78;
-      const kneeY=hipY-Math.cos(thighRot)*.62;
-      draw(meshes.cylinder,model([hipX,(hipY+kneeY)/2,(hipZ+kneeZ)/2],[thighRot,0,0],[.20,.42,.20],root),COLORS.raptor);
-      const shinRot=-.18-phase*.48;
-      const ankleZ=kneeZ+Math.sin(shinRot)*.72;
-      const ankleY=Math.max(.18,kneeY-Math.cos(shinRot)*.62);
-      draw(meshes.cylinder,model([hipX,(kneeY+ankleY)/2,(kneeZ+ankleZ)/2],[shinRot,0,0],[.14,.39,.14],root),COLORS.raptorLight);
-      draw(meshes.sphere,model([hipX,ankleY,ankleZ-.18],[0,0,0],[.22,.12,.44],root),COLORS.raptorDark);
-      for(let c=-1;c<=1;c++) draw(meshes.cone,model([hipX+c*.11,ankleY-.02,ankleZ-.53],[Math.PI/2,0,0],[.035,.17,.035],root),COLORS.tooth);
+      const phase=side===-1?run:opposite,hipX=side*.49,hipY=bodyY-.35,hipZ=.15;
+      const thigh=.20+phase*.63,kneeZ=hipZ+Math.sin(thigh)*.78,kneeY=hipY-Math.cos(thigh)*.62;
+      draw(meshes.cylinder,model([hipX,(hipY+kneeY)/2,(hipZ+kneeZ)/2],[thigh,0,0],[.21,.43,.21],root),COLORS.raptor);
+      const shin=-.18-phase*.48,ankleZ=kneeZ+Math.sin(shin)*.72,ankleY=Math.max(.18,kneeY-Math.cos(shin)*.62);
+      draw(meshes.cylinder,model([hipX,(kneeY+ankleY)/2,(kneeZ+ankleZ)/2],[shin,0,0],[.145,.40,.145],root),COLORS.raptorLight);
+      draw(meshes.sphere,model([hipX,ankleY,ankleZ-.18],[0,0,0],[.23,.12,.45],root),COLORS.raptorDark);
+      for(let c=-1;c<=1;c++) draw(meshes.cone,model([hipX+c*.11,ankleY-.02,ankleZ-.53],[Math.PI/2,0,0],[.036,.18,.036],root),COLORS.tooth);
+      draw(meshes.cone,model([hipX-side*.18,ankleY+.13,ankleZ-.28],[.42,0,side*.52],[.065,.25,.065],root),COLORS.tooth);
+      const arm=opposite*.18*side;
+      draw(meshes.cylinder,model([side*.53,bodyY+.27,-.73],[.75+arm,0,side*.2],[.095,.32,.095],root),COLORS.raptorLight);
+      draw(meshes.cylinder,model([side*.60,bodyY+.02,-.96],[-.45-arm,0,side*.28],[.072,.24,.072],root),COLORS.raptorDark);
+      draw(meshes.sphere,model([side*.69,bodyY+.17,-.86],[0,0,side*.30],[.10,.28,.34],root),COLORS.raptorDark);
+      for(let c=0;c<2;c++) draw(meshes.cone,model([side*(.61+c*.06),bodyY-.14,-1.08-c*.03],[Math.PI/2,0,0],[.022,.095,.022],root),COLORS.tooth);
     }
-
-    // Arms.
-    for(const side of [-1,1]){
-      const arm=runOpp*.18*side;
-      draw(meshes.cylinder,model([side*.52,bodyY+.26,-.73],[.75+arm,0,side*.2],[.09,.31,.09],root),COLORS.raptorLight);
-      draw(meshes.cylinder,model([side*.59,bodyY+.02,-.95],[-.45-arm,0,side*.28],[.07,.23,.07],root),COLORS.raptorDark);
-      for(let c=0;c<2;c++) draw(meshes.cone,model([side*(.60+c*.06),bodyY-.14,-1.07-c*.03],[Math.PI/2,0,0],[.022,.09,.022],root),COLORS.tooth);
-    }
+    for(const side of [-1,1]) draw(meshes.sphere,model([side*.21,bodyY+.76,-2.18],[0,0,0],[.035,.028,.025],root),COLORS.pupil);
   }
+
 
   function drawParticles(){
     for(const p of particles){
@@ -235,6 +263,7 @@
     gl.uniformMatrix4fv(U.viewProj,false,vp); gl.uniform3fv(U.camera,eye);
 
     drawGround();
+    drawSceneryDetails();
     const sorted=[...env].sort((a,b)=>a.z-b.z);
     for(const e of sorted){
       if(e.type==='tree') drawTree(e);

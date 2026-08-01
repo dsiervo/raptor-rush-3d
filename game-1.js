@@ -143,7 +143,7 @@
       vec3 n = normalize(vNormal);
       float diff = max(dot(n, normalize(-uLightDir)), 0.0);
       float rim = pow(1.0 - max(dot(n, normalize(uCamera-vWorld)), 0.0), 2.0) * .16;
-      vec3 lit = uColor.rgb * (0.52 + diff * 0.58 + rim);
+      vec3 viewDir=normalize(uCamera-vWorld); float spec=pow(max(dot(reflect(normalize(uLightDir),n),viewDir),0.0),18.0)*.16; float hemi=.08*(n.y*.5+.5); vec3 lit=uColor.rgb*(.48+diff*.62+rim+hemi)+vec3(spec);
       float d = distance(uCamera, vWorld);
       float fog = smoothstep(uFogNear,uFogFar,d);
       gl_FragColor = vec4(mix(lit,uFogColor,fog),uColor.a);
