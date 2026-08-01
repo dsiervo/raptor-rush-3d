@@ -3,21 +3,26 @@ name: Apply Phase 1 raptor animation
 on:
   push:
     branches:
-      - phase1-raptor-animation-20260801
+      - main
     paths:
       - .phase1-ready
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
-  build-test-commit:
+  build-test-deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout release branch
+      - name: Checkout main
         uses: actions/checkout@v6
         with:
-          ref: phase1-raptor-animation-20260801
+          ref: main
           fetch-depth: 0
 
       - name: Assemble player atlas
@@ -157,7 +162,7 @@ jobs:
           JS
           node /tmp/phase1-test.js | tee /tmp/phase1-test-results.json
 
-      - name: Upload QA screenshot
+      - name: Upload QA evidence
         uses: actions/upload-artifact@v4
         with:
           name: phase1-mobile-qa
@@ -166,6 +171,7 @@ jobs:
             /tmp/phase1-test-results.json
 
       - name: Commit tested Phase 1 release
+        id: release
         shell: bash
         run: |
           set -euo pipefail
@@ -174,4 +180,26 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "Complete Phase 1 rear-view raptor animation"
-          git push origin HEAD:phase1-raptor-animation-20260801
+          git push origin HEAD:main
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload tested site
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .
+
+      - name: Deploy tested site
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Record deployed Phase 1 commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "${{ steps.release.outputs.sha }}" > .pages-deployed
+          git add .pages-deployed
+          git commit -m "Record Phase 1 Pages deployment"
+          git push origin HEAD:main
