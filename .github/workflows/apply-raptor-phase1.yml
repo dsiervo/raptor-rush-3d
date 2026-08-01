@@ -25,8 +25,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p assets
-          cat .phase1/atlas/part-*.txt | base64 --decode > assets/raptor-player.webp
-          echo "bd1f8cde483c3e281970630c135d0b912b2ddf9289eda62c14e41c4f817a7514  assets/raptor-player.webp" | sha256sum -c -
+          cat .phase1/atlas/part-*.txt | base64 --decode > assets/raptor-player.avif
+          echo "b2dc22cdcc6b99c57123c033ea25f17ff8488f6533c5c6fa1059a19dd1cd418b  assets/raptor-player.avif" | sha256sum -c -
 
       - name: Integrate Phase 1 animation
         shell: bash
@@ -52,7 +52,7 @@ jobs:
           )
           replace_once(
               "function loadAssets(){return loadImage('atlas','assets/game-atlas.avif?v=20260801-mega2')}",
-              "function loadAssets(){return Promise.all([loadImage('atlas','assets/game-atlas.avif?v=20260801-mega2'),loadImage('player','assets/raptor-player.webp?v=20260801-phase1')])}",
+              "function loadAssets(){return Promise.all([loadImage('atlas','assets/game-atlas.avif?v=20260801-mega2'),loadImage('player','assets/raptor-player.avif?v=20260801-phase1')])}",
               'asset loader'
           )
           old_player = "player={lane:0,x:0,y:0,vy:0,slide:0,hurt:0,invuln:0}"
