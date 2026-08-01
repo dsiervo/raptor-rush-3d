@@ -78,6 +78,7 @@
   }
 
 
+
   function drawEnvRock(e){
     draw(meshes.sphere,model([e.x,.45*e.scale,e.z],[0,e.spin,.08],[1.2*e.scale,.62*e.scale,.92*e.scale]),COLORS.stone);
     if(e.scale>.9) draw(meshes.sphere,model([e.x+.7*e.scale,.22*e.scale,e.z+.25],[0,-e.spin,0],[.55*e.scale,.35*e.scale,.48*e.scale]),COLORS.stoneLight);
@@ -121,6 +122,7 @@
 
 
 
+
   function drawPteroObstacle(x,z,o){
     const flap=Math.sin(worldTime*8.4+o.spin);
     const lift=Math.abs(flap)*.22;
@@ -144,6 +146,7 @@
     }
     draw(meshes.cylinder,model([x,1.58+lift,z-.78],[Math.PI/2,0,0],[.16,.48,.16]),skin);
   }
+
 
 
 
@@ -244,6 +247,7 @@
 
 
 
+
   function drawParticles(){
     for(const p of particles){
       const c=[p.color[0],p.color[1],p.color[2],Math.max(0,p.life/p.max)];
@@ -267,6 +271,7 @@
     gl.uniformMatrix4fv(U.viewProj,false,vp); gl.uniform3fv(U.camera,eye);
 
     drawGround();
+    drawSceneryDetails();
     drawSceneryDetails();
     drawSceneryDetails();
     const sorted=[...env].sort((a,b)=>a.z-b.z);
