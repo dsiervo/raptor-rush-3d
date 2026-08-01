@@ -20,16 +20,29 @@ jobs:
           ref: asset-release-20260801
           fetch-depth: 0
 
-      - name: Assemble optimized game atlas
+      - name: Assemble optimized game release
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p assets
-          cat .release/atlas/part-*.txt | base64 --decode > assets/game-atlas.webp
+          cat .release/atlas-avif/part-*.txt | base64 --decode > assets/game-atlas.avif
           cp .release/index.html index.html
           cp .release/style.css style.css
           cp .release/game.js game.js
-          test -s assets/game-atlas.webp
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('game.js')
+          s=p.read_text()
+          s=s.replace("const SPRITES={", "const ATLAS_SCALE=.35;\nconst SPRITES={", 1)
+          s=s.replace("assets/game-atlas.webp?v=20260801-mega1", "assets/game-atlas.avif?v=20260801-mega2")
+          s=s.replace("const im=images.atlas,iw=960,ih=540", "const im=images.atlas,iw=960*ATLAS_SCALE,ih=540*ATLAS_SCALE")
+          s=s.replace("sy=srcY}else", "sy=srcY*ATLAS_SCALE}else")
+          s=s.replace("sy=srcY+(ih-sh)/2", "sy=srcY*ATLAS_SCALE+(ih-sh)/2")
+          s=s.replace("ctx.drawImage(im,r[0],r[1],r[2],r[3],-dw/2,-dh,dw,dh)", "ctx.drawImage(im,r[0]*ATLAS_SCALE,r[1]*ATLAS_SCALE,r[2]*ATLAS_SCALE,r[3]*ATLAS_SCALE,-dw/2,-dh,dw,dh)")
+          p.write_text(s)
+          PY
+          test -s assets/game-atlas.avif
+          node --check game.js
           rm -rf .release .release-ready .github/workflows/apply-generated-assets.yml
 
       - name: Commit assembled release
