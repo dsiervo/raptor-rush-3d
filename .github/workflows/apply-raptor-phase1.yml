@@ -1,0 +1,205 @@
+name: Apply Phase 1 raptor animation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .phase1-ready
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build-test-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Assemble player atlas
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p assets
+          cat .phase1/atlas/part-*.txt | base64 --decode > assets/raptor-player.avif
+          echo "b2dc22cdcc6b99c57123c033ea25f17ff8488f6533c5c6fa1059a19dd1cd418b  assets/raptor-player.avif" | sha256sum -c -
+
+      - name: Integrate Phase 1 animation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('game.js')
+          s = p.read_text()
+
+          def replace_once(old, new, label):
+              global s
+              count = s.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected 1 match, found {count}')
+              s = s.replace(old, new, 1)
+
+          replace_once(
+              "};\nconst images={};",
+              "};\nconst PLAYER_SPRITES={\n run1:[0,0,384,384],run2:[384,0,384,384],run3:[768,0,384,384],\n run4:[0,384,384,384],turn_left:[384,384,384,384],turn_right:[768,384,384,384],\n jump:[0,768,384,384],slide:[384,768,384,384],hurt:[768,768,384,384]\n};\nconst images={};",
+              'player sprite map'
+          )
+          replace_once(
+              "function loadAssets(){return loadImage('atlas','assets/game-atlas.avif?v=20260801-mega2')}",
+              "function loadAssets(){return Promise.all([loadImage('atlas','assets/game-atlas.avif?v=20260801-mega2'),loadImage('player','assets/raptor-player.avif?v=20260801-phase1')])}",
+              'asset loader'
+          )
+          old_player = "player={lane:0,x:0,y:0,vy:0,slide:0,hurt:0,invuln:0}"
+          new_player = "player={lane:0,x:0,y:0,vy:0,slide:0,hurt:0,invuln:0,turnTimer:0,turnDir:0}"
+          if s.count(old_player) != 2:
+              raise SystemExit(f'player state: expected 2 matches, found {s.count(old_player)}')
+          s = s.replace(old_player, new_player)
+          replace_once(
+              "function move(dir){if(!['running','tutorial'].includes(state))return false;const old=player.lane;player.lane=Math.max(-1,Math.min(1,player.lane+dir));if(old!==player.lane){tone(210,.045,'sine',.015,dir*35);return true}return false}",
+              "function move(dir){if(!['running','tutorial'].includes(state))return false;const old=player.lane;player.lane=Math.max(-1,Math.min(1,player.lane+dir));if(old!==player.lane){player.turnDir=dir;player.turnTimer=.28;tone(210,.045,'sine',.015,dir*35);return true}return false}",
+              'turn state'
+          )
+          replace_once(
+              "player.slide=Math.max(0,player.slide-dt);player.invuln=Math.max(0,player.invuln-dt);player.hurt=Math.max(0,player.hurt-dt);shake*=Math.pow(.02,dt);",
+              "player.slide=Math.max(0,player.slide-dt);player.invuln=Math.max(0,player.invuln-dt);player.hurt=Math.max(0,player.hurt-dt);player.turnTimer=Math.max(0,player.turnTimer-dt);shake*=Math.pow(.02,dt);",
+              'turn timer update'
+          )
+          replace_once(
+              "function obstacleImage(o){",
+              "function playerSprite(name,x,y,scale,opts={}){const r=PLAYER_SPRITES[name],im=images.player;if(!r||!im)return;const dw=r[2]*scale,dh=r[3]*scale;ctx.save();ctx.translate(x,y);if(opts.alpha!==undefined)ctx.globalAlpha=opts.alpha;if(opts.shadow)ctx.filter='drop-shadow(0 9px 9px rgba(0,0,0,.42))';ctx.drawImage(im,r[0],r[1],r[2],r[3],-dw/2,-dh,dw,dh);ctx.restore();ctx.filter='none';ctx.globalAlpha=1}\nfunction obstacleImage(o){",
+              'player renderer'
+          )
+          replace_once(
+              "function playerImage(){if(player.hurt>0)return 'raptor_hurt';if(player.slide>0)return 'raptor_slide';if(player.y>.05)return 'raptor_jump';return Math.floor(time*7)%2?'raptor_run1':'raptor_run2'}\nfunction drawPlayer(){if(player.invuln>0&&Math.floor(player.invuln*12)%2===0)return;const baseX=w/2+player.x*w*.22,baseY=h*.92-player.y*h*.22;const sc=Math.min(w/390,h/844)*.64;const bob=player.y>0||player.slide>0?0:Math.sin(time*14)*3;sprite(playerImage(),baseX,baseY+bob,sc,{shadow:true});}",
+              "function playerImage(){if(player.hurt>0)return 'hurt';if(player.slide>0)return 'slide';if(player.y>.05)return 'jump';if(player.turnTimer>0)return player.turnDir<0?'turn_left':'turn_right';return `run${Math.floor(time*11)%4+1}`}\nfunction drawPlayer(){if(player.invuln>0&&Math.floor(player.invuln*12)%2===0)return;const viewportScale=Math.min(w/390,h/844);const baseX=w/2+player.x*w*.22,baseY=h*.92-player.y*h*.22;let sc=viewportScale*.55;if(player.y>.05)sc*=1.03;if(player.slide>0)sc*=.98;const runFrame=Math.floor(time*11)%4;const bob=player.y>0||player.slide>0||player.hurt>0||player.turnTimer>0?0:[0,-3,1,-2][runFrame]*viewportScale;playerSprite(playerImage(),baseX,baseY+bob,sc,{shadow:true});}",
+              'player animation'
+          )
+          replace_once(
+              "sliding:player.slide>0,tutorialIndex,",
+              "sliding:player.slide>0,playerFrame:playerImage(),turnTimer:+player.turnTimer.toFixed(2),turnDir:player.turnDir,tutorialIndex,",
+              'debug frame state'
+          )
+          replace_once(
+              "forceGoal(){distance=GOAL-1},clear(){obstacles=[];spawnTimer=99},",
+              "forceGoal(){distance=GOAL-1},skipTutorial(){tutorialIndex=tutorialSteps.length;tutorialObstacle=null;obstacles=[];spawnTimer=99;hideTutorial();if(state==='tutorial')state='running'},clear(){obstacles=[];spawnTimer=99},",
+              'debug tutorial control'
+          )
+          p.write_text(s)
+
+          p = Path('index.html')
+          s = p.read_text()
+          old = 'game.js?v=20260801-assets1'
+          if s.count(old) != 1:
+              raise SystemExit(f'index cache version: expected 1 match, found {s.count(old)}')
+          p.write_text(s.replace(old, 'game.js?v=20260801-phase1', 1))
+          PY
+          node --check game.js
+
+      - name: Run mobile Playwright test
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm init -y >/dev/null 2>&1
+          npm install --silent playwright@1.55.0
+          npx playwright install --with-deps chromium >/dev/null
+          python3 -m http.server 8000 >/tmp/raptor-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          cat > /tmp/phase1-test.js <<'JS'
+          const { chromium } = require('playwright');
+          const assert = require('assert');
+          (async()=>{
+            const browser=await chromium.launch({headless:true});
+            const page=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:1});
+            const errors=[];
+            page.on('pageerror',e=>errors.push(String(e)));
+            page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
+            await page.goto('http://127.0.0.1:8000',{waitUntil:'networkidle'});
+            await page.waitForFunction(()=>window.__RAPTOR_GAME__?.state==='home');
+            await page.evaluate(()=>{window.__RAPTOR_GAME__.start();window.__RAPTOR_GAME__.skipTutorial()});
+            const frames=new Set();
+            for(let i=0;i<8;i++){
+              await page.waitForTimeout(105);
+              frames.add((await page.evaluate(()=>window.__RAPTOR_GAME__.stats.playerFrame)));
+            }
+            assert(frames.size>=3,`run cycle only showed ${[...frames]}`);
+            assert([...frames].every(f=>/^run[1-4]$/.test(f)),`unexpected run frame ${[...frames]}`);
+            await page.evaluate(()=>window.__RAPTOR_GAME__.left());
+            await page.waitForTimeout(45);
+            assert.equal(await page.evaluate(()=>window.__RAPTOR_GAME__.stats.playerFrame),'turn_left');
+            await page.waitForTimeout(320);
+            await page.evaluate(()=>window.__RAPTOR_GAME__.right());
+            await page.waitForTimeout(45);
+            assert.equal(await page.evaluate(()=>window.__RAPTOR_GAME__.stats.playerFrame),'turn_right');
+            await page.waitForTimeout(320);
+            await page.evaluate(()=>window.__RAPTOR_GAME__.jump());
+            await page.waitForTimeout(90);
+            assert.equal(await page.evaluate(()=>window.__RAPTOR_GAME__.stats.playerFrame),'jump');
+            await page.waitForTimeout(1000);
+            await page.evaluate(()=>window.__RAPTOR_GAME__.slide());
+            await page.waitForTimeout(45);
+            assert.equal(await page.evaluate(()=>window.__RAPTOR_GAME__.stats.playerFrame),'slide');
+            await page.waitForTimeout(950);
+            await page.evaluate(()=>window.__RAPTOR_GAME__.forceDamage());
+            await page.waitForTimeout(45);
+            assert.equal(await page.evaluate(()=>window.__RAPTOR_GAME__.stats.playerFrame),'hurt');
+            assert.equal(errors.length,0,errors.join('\n'));
+            await page.screenshot({path:'/tmp/phase1-mobile.png'});
+            await browser.close();
+            console.log(JSON.stringify({frames:[...frames],viewport:'390x844',left:'ok',right:'ok',jump:'ok',slide:'ok',hurt:'ok',errors:0}));
+          })().catch(e=>{console.error(e);process.exit(1)});
+          JS
+          node /tmp/phase1-test.js | tee /tmp/phase1-test-results.json
+
+      - name: Upload QA evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-mobile-qa
+          path: |
+            /tmp/phase1-mobile.png
+            /tmp/phase1-test-results.json
+
+      - name: Commit tested Phase 1 release
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .phase1 .phase1-ready .github/workflows/apply-raptor-phase1.yml node_modules package.json package-lock.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Complete Phase 1 rear-view raptor animation"
+          git push origin HEAD:main
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload tested site
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .
+
+      - name: Deploy tested site
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Record deployed Phase 1 commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "${{ steps.release.outputs.sha }}" > .pages-deployed
+          git add .pages-deployed
+          git commit -m "Record Phase 1 Pages deployment"
+          git push origin HEAD:main
