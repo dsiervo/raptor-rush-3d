@@ -22,6 +22,8 @@ const fs = require('fs');
   const assets = await page.evaluate(() => window.__RAPTOR_GAME__.assets);
   assert(assets.atlas?.width > 0 && assets.atlas?.height > 0, 'obstacle atlas did not load');
   assert(assets.player?.width > 0 && assets.player?.height > 0, 'player atlas did not load');
+  assert.deepEqual(assets.ptero0, { width: 512, height: 384 });
+  assert.deepEqual(assets.ptero1, { width: 512, height: 384 });
 
   await page.evaluate(() => {
     window.__RAPTOR_GAME__.start();
@@ -70,6 +72,7 @@ const fs = require('fs');
     assert(ptero.centerY < ptero.groundY - 120, `pteranodon appears at ground level: ${JSON.stringify(ptero)}`);
   }
   assert(pteroFrames.size >= 3, `pteranodon animation showed only: ${[...pteroFrames]}`);
+  assert(![...pteroFrames].some(frame => frame === 'ptero_up' || frame === 'ptero_mid'), `old vertical pteranodon frames remain: ${[...pteroFrames]}`);
 
   await page.screenshot({ path: 'qa/phase2-mobile.png' });
   assert.equal(errors.length, 0, errors.join('\n'));
