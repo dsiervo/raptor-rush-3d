@@ -40,6 +40,14 @@ const fs = require('fs');
   const centers = visual.track.laneCenters;
   assert(Math.abs((centers[1] - centers[0]) - (centers[2] - centers[1])) < 1, `unequal lane spacing: ${centers}`);
 
+  const firstDashOffset = visual.track.dashOffset;
+  await page.waitForTimeout(120);
+  visual = await page.evaluate(() => window.__RAPTOR_GAME__.visual);
+  const secondDashOffset = visual.track.dashOffset;
+  assert.equal(visual.track.dashDirection, 'toward-player', 'lane markers are not configured to move toward the player');
+  assert(firstDashOffset < 0 && secondDashOffset < 0, `lane dash offsets must be negative: ${firstDashOffset}, ${secondDashOffset}`);
+  assert(secondDashOffset < firstDashOffset, `lane markers moved toward the horizon: ${firstDashOffset} -> ${secondDashOffset}`);
+
   await page.evaluate(() => {
     window.__RAPTOR_GAME__.clear();
     window.__RAPTOR_GAME__.forceObstacle('boulder', -1, 10);
@@ -59,17 +67,35 @@ const fs = require('fs');
 
   await page.evaluate(() => {
     window.__RAPTOR_GAME__.clear();
-    window.__RAPTOR_GAME__.forceObstacle('ptero', 0, 25);
+    window.__RAPTOR_GAME__.jump();
+  });
+  let maxJumpY = 0;
+  for (let i = 0; i < 50; i++) {
+    await page.waitForTimeout(18);
+    const y = await page.evaluate(() => window.__RAPTOR_GAME__.stats.y);
+    maxJumpY = Math.max(maxJumpY, y);
+  }
+  assert(maxJumpY >= 0.55, `jump is too low to clear obstacles: ${maxJumpY}`);
+  assert(maxJumpY <= 0.9, `jump still looks unrealistically high: ${maxJumpY}`);
+  const jumpPixels = maxJumpY * 844 * 0.18;
+  assert(jumpPixels <= 140, `rendered jump displacement is too high: ${jumpPixels}`);
+  await page.waitForFunction(() => window.__RAPTOR_GAME__.stats.y === 0, null, { timeout: 2000 });
+
+  await page.evaluate(() => {
+    window.__RAPTOR_GAME__.clear();
+    window.__RAPTOR_GAME__.forceObstacle('ptero', 0, 18);
   });
   const pteroFrames = new Set();
   let ptero;
+  let minClearance = Infinity;
   for (let i = 0; i < 8; i++) {
-    await page.waitForTimeout(75);
+    await page.waitForTimeout(60);
     ptero = await page.evaluate(() => window.__RAPTOR_GAME__.visual.ptero);
-    assert(ptero, 'pteranodon was not rendered while inside the playfield');
+    assert(ptero, 'pteranodon was not rendered while approaching the player');
     pteroFrames.add(ptero.frame);
-    assert(ptero.altitude >= 130, `pteranodon too low: ${ptero.altitude}`);
-    assert(ptero.centerY < ptero.groundY - 120, `pteranodon appears at ground level: ${JSON.stringify(ptero)}`);
+    minClearance = Math.min(minClearance, ptero.clearance);
+    assert(ptero.clearance >= 145, `pteranodon appears too close to the ground: ${JSON.stringify(ptero)}`);
+    assert(ptero.rect.y + ptero.rect.height <= ptero.groundY - 145, `pteranodon sprite reaches the ground plane: ${JSON.stringify(ptero)}`);
   }
   assert(pteroFrames.size >= 3, `pteranodon animation showed only: ${[...pteroFrames]}`);
   assert(![...pteroFrames].some(frame => frame === 'ptero_up' || frame === 'ptero_mid'), `old vertical pteranodon frames remain: ${[...pteroFrames]}`);
@@ -82,11 +108,18 @@ const fs = require('fs');
     viewport: '390x844@2x',
     assets,
     background: finalVisual.background,
-    track: finalVisual.track,
+    track: {
+      ...finalVisual.track,
+      testedOffsets: [firstDashOffset, secondDashOffset]
+    },
     obstacleRatios,
+    jump: {
+      maxY: +maxJumpY.toFixed(2),
+      displacementPx: +jumpPixels.toFixed(1)
+    },
     pteranodon: {
       frames: [...pteroFrames],
-      altitude: ptero.altitude,
+      minimumClearance: minClearance,
       groundY: ptero.groundY,
       centerY: ptero.centerY
     },
