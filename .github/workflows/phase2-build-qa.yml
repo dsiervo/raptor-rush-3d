@@ -1,0 +1,71 @@
+name: Build and test Phase 2 visuals
+
+on:
+  push:
+    branches:
+      - phase2-visual-fix
+    paths:
+      - .phase2-ready
+
+permissions:
+  contents: write
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Phase 2 branch
+        uses: actions/checkout@v6
+        with:
+          ref: phase2-visual-fix
+          fetch-depth: 0
+
+      - name: Assemble optimized visual assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p assets /tmp/phase2-package
+          cat .phase2/package/part-*.txt | base64 --decode > /tmp/phase2-assets.zip
+          printf '%s  %s\n' 'a415e1e2ca3e5e559e09eaf2a3471494599a8933e2ecd6a2994e915c2f4254d0' '/tmp/phase2-assets.zip' | sha256sum -c -
+          unzip -q -o /tmp/phase2-assets.zip -d assets
+          test -s assets/phase2-jungle.avif
+          test -s assets/phase2-desert.avif
+          test -s assets/phase2-obstacles.avif
+          test -s assets/phase2-ptero.avif
+          node --check game.js
+
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --silent playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Run mobile visual QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8000 >/tmp/phase2-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          node qa/phase2-test.js
+
+      - name: Upload QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase2-mobile-qa
+          path: |
+            qa/phase2-mobile.png
+            qa/phase2-report.json
+            /tmp/phase2-http.log
+
+      - name: Commit tested Phase 2 release
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .phase2 .phase2-ready .github/workflows/phase2-build-qa.yml node_modules package.json package-lock.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Complete Phase 2 track, scale, background, and pteranodon visuals'
+          git push origin HEAD:phase2-visual-fix
