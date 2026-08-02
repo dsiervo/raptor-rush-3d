@@ -5,6 +5,10 @@
       "width": 627,
       "height": 848
     },
+    "ptero1": {
+      "width": 512,
+      "height": 384
+    },
     "ptero0": {
       "width": 512,
       "height": 384
@@ -12,10 +16,6 @@
     "player": {
       "width": 639,
       "height": 639
-    },
-    "ptero1": {
-      "width": 512,
-      "height": 384
     }
   },
   "background": {
@@ -35,6 +35,12 @@
       67.60000000000001,
       195,
       322.4
+    ],
+    "dashOffset": -38.23,
+    "dashDirection": "toward-player",
+    "testedOffsets": [
+      -6.94,
+      -12.82
     ]
   },
   "obstacleRatios": [
@@ -51,15 +57,19 @@
       "ratio": 0.96
     }
   ],
+  "jump": {
+    "maxY": 0.73,
+    "displacementPx": 110.9
+  },
   "pteranodon": {
     "frames": [
-      "ptero0",
+      "ptero_glide",
       "ptero1",
-      "ptero_glide"
+      "ptero0"
     ],
-    "altitude": 174,
-    "groundY": 793.3,
-    "centerY": 619.3
+    "minimumClearance": 160,
+    "groundY": 797.6,
+    "centerY": 571.2
   },
   "errors": 0
 }
