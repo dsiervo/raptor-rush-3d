@@ -1,30 +1,42 @@
 const { chromium } = require('playwright');
 const assert = require('assert');
+const fs = require('fs');
 
 (async () => {
   const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
+  const page = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true
+  });
   const errors = [];
-  page.on('pageerror', e => errors.push(String(e)));
-  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('pageerror', error => errors.push(String(error)));
+  page.on('console', message => {
+    if (message.type() === 'error') errors.push(message.text());
+  });
 
   await page.goto('http://127.0.0.1:8000', { waitUntil: 'networkidle' });
   await page.waitForFunction(() => window.__RAPTOR_GAME__?.state === 'home');
 
   const assets = await page.evaluate(() => window.__RAPTOR_GAME__.assets);
-  assert(assets.jungle.width >= 1600 && assets.jungle.height >= 900, `jungle background too small: ${JSON.stringify(assets.jungle)}`);
-  assert(assets.desert.width >= 1600 && assets.desert.height >= 900, `desert background too small: ${JSON.stringify(assets.desert)}`);
-  assert.deepEqual(assets.obstacles, { width: 1152, height: 768 });
-  assert.deepEqual(assets.ptero, { width: 1152, height: 384 });
+  assert(assets.atlas?.width > 0 && assets.atlas?.height > 0, 'obstacle atlas did not load');
+  assert(assets.player?.width > 0 && assets.player?.height > 0, 'player atlas did not load');
 
-  await page.evaluate(() => { window.__RAPTOR_GAME__.start(); window.__RAPTOR_GAME__.skipTutorial(); });
-  await page.waitForTimeout(150);
+  await page.evaluate(() => {
+    window.__RAPTOR_GAME__.start();
+    window.__RAPTOR_GAME__.skipTutorial();
+  });
+  await page.waitForTimeout(180);
+
   let visual = await page.evaluate(() => window.__RAPTOR_GAME__.visual);
+  assert.equal(visual.background.procedural, true, 'background is not resolution-independent');
+  assert(visual.background.backingWidth >= 780, `canvas backing width too low: ${visual.background.backingWidth}`);
+  assert(visual.background.backingHeight >= 1688, `canvas backing height too low: ${visual.background.backingHeight}`);
   assert(visual.track.bottomWidth >= 380, `track too narrow: ${visual.track.bottomWidth}`);
-  const centers = visual.track.laneCenters;
-  assert(Math.abs((centers[1]-centers[0])-(centers[2]-centers[1])) < 1, `unequal lane spacing: ${centers}`);
   assert(visual.track.laneWidth >= 120, `lane too narrow: ${visual.track.laneWidth}`);
-  assert(visual.background.naturalWidth >= 1600, 'background is not high resolution');
+  const centers = visual.track.laneCenters;
+  assert(Math.abs((centers[1] - centers[0]) - (centers[2] - centers[1])) < 1, `unequal lane spacing: ${centers}`);
 
   await page.evaluate(() => {
     window.__RAPTOR_GAME__.clear();
@@ -32,37 +44,52 @@ const assert = require('assert');
     window.__RAPTOR_GAME__.forceObstacle('log', 0, 10);
     window.__RAPTOR_GAME__.forceObstacle('thorn', 1, 10);
   });
-  await page.waitForTimeout(120);
+  await page.waitForTimeout(140);
   visual = await page.evaluate(() => window.__RAPTOR_GAME__.visual);
-  assert.equal(visual.obstacles.length, 3);
-  for (const o of visual.obstacles) {
-    assert(o.ratio <= 1.02, `${o.type} too wide for lane: ${o.ratio}`);
-    assert(o.rect.x >= -2 && o.rect.x + o.rect.width <= 392, `${o.type} outside screen: ${JSON.stringify(o.rect)}`);
+  assert.equal(visual.obstacles.length, 3, `expected 3 obstacles, got ${visual.obstacles.length}`);
+  for (const obstacle of visual.obstacles) {
+    assert(obstacle.ratio <= 1.02, `${obstacle.type} too wide for its lane: ${obstacle.ratio}`);
+    assert(obstacle.rect.x >= -2, `${obstacle.type} begins outside viewport: ${JSON.stringify(obstacle.rect)}`);
+    assert(obstacle.rect.x + obstacle.rect.width <= 392, `${obstacle.type} ends outside viewport: ${JSON.stringify(obstacle.rect)}`);
   }
 
-  await page.evaluate(() => { window.__RAPTOR_GAME__.clear(); window.__RAPTOR_GAME__.forceObstacle('ptero', 0, 10); });
+  await page.evaluate(() => {
+    window.__RAPTOR_GAME__.clear();
+    window.__RAPTOR_GAME__.forceObstacle('ptero', 0, 10);
+  });
   const pteroFrames = new Set();
-  for (let i=0; i<7; i++) {
-    await page.waitForTimeout(95);
-    const p = await page.evaluate(() => window.__RAPTOR_GAME__.visual.ptero);
-    assert(p, 'pteranodon was not rendered');
-    pteroFrames.add(p.frame);
-    assert(p.altitude >= 130, `pteranodon too low: ${p.altitude}`);
-    assert(p.centerY < p.groundY - 120, `pteranodon appears on ground: ${JSON.stringify(p)}`);
+  let ptero;
+  for (let i = 0; i < 9; i++) {
+    await page.waitForTimeout(90);
+    ptero = await page.evaluate(() => window.__RAPTOR_GAME__.visual.ptero);
+    assert(ptero, 'pteranodon was not rendered');
+    pteroFrames.add(ptero.frame);
+    assert(ptero.altitude >= 130, `pteranodon too low: ${ptero.altitude}`);
+    assert(ptero.centerY < ptero.groundY - 120, `pteranodon appears at ground level: ${JSON.stringify(ptero)}`);
   }
-  assert(pteroFrames.size >= 3, `pteranodon animation insufficient: ${[...pteroFrames]}`);
+  assert(pteroFrames.size >= 3, `pteranodon animation showed only: ${[...pteroFrames]}`);
 
-  await page.screenshot({ path: 'qa/phase2-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'qa/phase2-mobile.png' });
   assert.equal(errors.length, 0, errors.join('\n'));
+
   const report = {
-    viewport: '390x844',
+    viewport: '390x844@2x',
     assets,
+    background: visual.background,
     track: visual.track,
-    pteroFrames: [...pteroFrames],
-    pteroAltitude: visual.ptero.altitude,
+    obstacleRatios: visual.obstacles.filter(item => item.type !== 'ptero').map(item => ({ type: item.type, ratio: item.ratio })),
+    pteranodon: {
+      frames: [...pteroFrames],
+      altitude: ptero.altitude,
+      groundY: ptero.groundY,
+      centerY: ptero.centerY
+    },
     errors: 0
   };
-  require('fs').writeFileSync('qa/phase2-report.json', JSON.stringify(report, null, 2));
+  fs.writeFileSync('qa/phase2-report.json', `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report));
   await browser.close();
-})().catch(err => { console.error(err); process.exit(1); });
+})().catch(error => {
+  console.error(error);
+  process.exit(1);
+});
