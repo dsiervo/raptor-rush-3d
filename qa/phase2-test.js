@@ -47,22 +47,24 @@ const fs = require('fs');
   await page.waitForTimeout(140);
   visual = await page.evaluate(() => window.__RAPTOR_GAME__.visual);
   assert.equal(visual.obstacles.length, 3, `expected 3 obstacles, got ${visual.obstacles.length}`);
+  const obstacleRatios = [];
   for (const obstacle of visual.obstacles) {
     assert(obstacle.ratio <= 1.02, `${obstacle.type} too wide for its lane: ${obstacle.ratio}`);
     assert(obstacle.rect.x >= -2, `${obstacle.type} begins outside viewport: ${JSON.stringify(obstacle.rect)}`);
     assert(obstacle.rect.x + obstacle.rect.width <= 392, `${obstacle.type} ends outside viewport: ${JSON.stringify(obstacle.rect)}`);
+    obstacleRatios.push({ type: obstacle.type, ratio: obstacle.ratio });
   }
 
   await page.evaluate(() => {
     window.__RAPTOR_GAME__.clear();
-    window.__RAPTOR_GAME__.forceObstacle('ptero', 0, 10);
+    window.__RAPTOR_GAME__.forceObstacle('ptero', 0, 25);
   });
   const pteroFrames = new Set();
   let ptero;
-  for (let i = 0; i < 9; i++) {
-    await page.waitForTimeout(90);
+  for (let i = 0; i < 8; i++) {
+    await page.waitForTimeout(75);
     ptero = await page.evaluate(() => window.__RAPTOR_GAME__.visual.ptero);
-    assert(ptero, 'pteranodon was not rendered');
+    assert(ptero, 'pteranodon was not rendered while inside the playfield');
     pteroFrames.add(ptero.frame);
     assert(ptero.altitude >= 130, `pteranodon too low: ${ptero.altitude}`);
     assert(ptero.centerY < ptero.groundY - 120, `pteranodon appears at ground level: ${JSON.stringify(ptero)}`);
@@ -72,12 +74,13 @@ const fs = require('fs');
   await page.screenshot({ path: 'qa/phase2-mobile.png' });
   assert.equal(errors.length, 0, errors.join('\n'));
 
+  const finalVisual = await page.evaluate(() => window.__RAPTOR_GAME__.visual);
   const report = {
     viewport: '390x844@2x',
     assets,
-    background: visual.background,
-    track: visual.track,
-    obstacleRatios: visual.obstacles.filter(item => item.type !== 'ptero').map(item => ({ type: item.type, ratio: item.ratio })),
+    background: finalVisual.background,
+    track: finalVisual.track,
+    obstacleRatios,
     pteranodon: {
       frames: [...pteroFrames],
       altitude: ptero.altitude,
