@@ -1,6 +1,9 @@
 name: Test Phase 2 visuals
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - phase2-visual-fix
@@ -8,17 +11,14 @@ on:
       - .phase2-ready
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   mobile-visual-qa:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Phase 2 branch
+      - name: Checkout tested revision
         uses: actions/checkout@v6
-        with:
-          ref: phase2-visual-fix
-          fetch-depth: 0
 
       - name: Validate JavaScript
         run: node --check game.js
@@ -47,15 +47,3 @@ jobs:
             qa/phase2-mobile.png
             qa/phase2-report.json
             /tmp/phase2-http.log
-
-      - name: Commit tested Phase 2 release
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -f .phase2-ready .github/workflows/phase2-build-qa.yml
-          rm -rf node_modules package.json package-lock.json
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git commit -m 'Complete Phase 2 track, scale, background, and pteranodon visuals'
-          git push origin HEAD:phase2-visual-fix
