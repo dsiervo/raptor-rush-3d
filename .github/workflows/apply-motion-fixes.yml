@@ -1,0 +1,63 @@
+name: Apply and test motion fixes
+
+on:
+  push:
+    branches:
+      - phase2-motion-fixes
+    paths:
+      - .motion-ready
+
+permissions:
+  contents: write
+
+jobs:
+  apply-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout motion-fix branch
+        uses: actions/checkout@v6
+        with:
+          ref: phase2-motion-fixes
+          fetch-depth: 0
+
+      - name: Apply deterministic fixes
+        run: |
+          set -euo pipefail
+          python3 scripts/apply-motion-fixes.py
+          node --check game.js
+
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --silent playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Run mobile visual QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8000 >/tmp/motion-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          node qa/phase2-test.js
+
+      - name: Upload QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: motion-fix-mobile-qa
+          path: |
+            qa/phase2-mobile.png
+            qa/phase2-report.json
+            /tmp/motion-http.log
+
+      - name: Commit tested fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf scripts/apply-motion-fixes.py .motion-ready .github/workflows/apply-motion-fixes.yml node_modules package.json package-lock.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Fix pteranodon altitude, lane motion, and jump height'
+          git push origin HEAD:phase2-motion-fixes
