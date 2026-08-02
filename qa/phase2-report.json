@@ -1,0 +1,65 @@
+{
+  "viewport": "390x844@2x",
+  "assets": {
+    "atlas": {
+      "width": 627,
+      "height": 848
+    },
+    "ptero0": {
+      "width": 512,
+      "height": 384
+    },
+    "player": {
+      "width": 639,
+      "height": 639
+    },
+    "ptero1": {
+      "width": 512,
+      "height": 384
+    }
+  },
+  "background": {
+    "procedural": true,
+    "blend": 0,
+    "backingWidth": 780,
+    "backingHeight": 1688,
+    "dpr": 2
+  },
+  "track": {
+    "horizonY": 261.64,
+    "bottomY": 837.248,
+    "topWidth": 58.5,
+    "bottomWidth": 382.2,
+    "laneWidth": 127.39999999999999,
+    "laneCenters": [
+      67.60000000000001,
+      195,
+      322.4
+    ]
+  },
+  "obstacleRatios": [
+    {
+      "type": "boulder",
+      "ratio": 0.92
+    },
+    {
+      "type": "log",
+      "ratio": 0.98
+    },
+    {
+      "type": "thorn",
+      "ratio": 0.96
+    }
+  ],
+  "pteranodon": {
+    "frames": [
+      "ptero0",
+      "ptero1",
+      "ptero_glide"
+    ],
+    "altitude": 174,
+    "groundY": 793.3,
+    "centerY": 619.3
+  },
+  "errors": 0
+}

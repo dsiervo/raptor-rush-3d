@@ -13,26 +13,22 @@
 <main id="game-shell" aria-label="Raptor Rush 3D">
   <canvas id="game" aria-label="Juego Raptor Rush 3D"></canvas>
   <div id="loading" class="overlay visible"><div class="loader"></div><strong>CARGANDO EXPEDICIÓN</strong></div>
-
   <section id="hud" class="hidden" aria-live="polite">
     <div class="hud-card"><small>DISTANCIA</small><strong id="score">0 m</strong></div>
     <div id="lives" class="hud-card hearts" aria-label="5 vidas"><span>♥</span><span>♥</span><span>♥</span><span>♥</span><span>♥</span></div>
     <button id="pause-btn" class="pause-btn" aria-label="Pausar">Ⅱ</button>
     <div id="goal"><div><span>JUNGLA</span><b id="goal-left">1800 m</b><span>DESIERTO</span></div><i><em id="goal-fill"></em></i></div>
   </section>
-
   <div id="tutorial" aria-hidden="true"><div id="gesture" data-direction="left"><i></i><b>☝</b></div></div>
   <div id="damage"></div><div id="toast"></div>
-
   <section id="home" class="overlay">
     <div class="hero-copy"><small>JUNGLE ESCAPE</small><h1>RAPTOR<br><em>RUSH</em></h1><p>Escapa de la jungla y alcanza el desierto.</p></div>
     <button id="start-btn" class="primary">INICIAR EXPEDICIÓN</button>
   </section>
-
   <section id="pause" class="overlay compact"><div class="panel"><small>PAUSA</small><h2>La expedición espera</h2><button id="resume-btn" class="primary">CONTINUAR</button><button id="restart-pause" class="ghost">REINICIAR</button></div></section>
   <section id="over" class="overlay compact"><div class="panel"><small>SIN VIDAS</small><h2>¡Buen intento!</h2><div class="results"><div><span>Distancia</span><b id="final-distance">0 m</b></div><div><span>Récord</span><b id="best-distance">0 m</b></div></div><button id="restart-btn" class="primary">CORRER DE NUEVO</button><button id="home-btn" class="ghost">INICIO</button></div></section>
   <section id="win" class="overlay compact"><div class="panel win"><small>DESTINO ALCANZADO</small><h2>¡Llegaste al desierto!</h2><div class="results"><div><span>Distancia</span><b>1800 m</b></div><div><span>Vidas</span><b id="win-lives">5</b></div></div><button id="win-restart" class="primary">OTRA EXPEDICIÓN</button><button id="win-home" class="ghost">INICIO</button></div></section>
 </main>
-<script src="game.js?v=20260801-phase1"></script>
+<script src="game.js?v=20260802-phase2c"></script>
 </body>
 </html>

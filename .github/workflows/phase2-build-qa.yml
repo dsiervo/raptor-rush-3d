@@ -1,0 +1,49 @@
+name: Test Phase 2 visuals
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - phase2-visual-fix
+    paths:
+      - .phase2-ready
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-visual-qa:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tested revision
+        uses: actions/checkout@v6
+
+      - name: Validate JavaScript
+        run: node --check game.js
+
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --silent playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Run mobile visual QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8000 >/tmp/phase2-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          node qa/phase2-test.js
+
+      - name: Upload QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase2-mobile-qa
+          path: |
+            qa/phase2-mobile.png
+            qa/phase2-report.json
+            /tmp/phase2-http.log
