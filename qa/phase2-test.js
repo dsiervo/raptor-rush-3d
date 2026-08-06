@@ -22,7 +22,6 @@ const fs = require('fs');
   const assets = await page.evaluate(() => window.__RAPTOR_GAME__.assets);
   assert(assets.atlas?.width > 0 && assets.atlas?.height > 0, 'obstacle atlas did not load');
   assert(assets.player?.width > 0 && assets.player?.height > 0, 'player atlas did not load');
-  assert.deepEqual(assets.pteroSheet, { width: 1152, height: 256 });
 
   await page.evaluate(() => {
     window.__RAPTOR_GAME__.start();
@@ -94,9 +93,9 @@ const fs = require('fs');
     await page.waitForTimeout(55);
     ptero = await page.evaluate(() => window.__RAPTOR_GAME__.visual.ptero);
     assert(ptero, 'Pteranodon was not rendered while approaching the player');
-    assert.equal(ptero.frame, 'sheet-crossfade');
-    assert.equal(ptero.source, 'pteroSheet');
-    assert.equal(ptero.frames.length, 2);
+    assert.equal(ptero.frame, 'procedural-flight');
+    assert.equal(ptero.source, 'vector-pteranodon');
+    assert.deepEqual(ptero.frames, ['continuous-wing-cycle']);
     assert(Math.abs(ptero.alphaTotal - 1) < .001, `Pteranodon opacity gap: ${ptero.alphaTotal}`);
     pteroMixes.push(ptero.mix);
   }

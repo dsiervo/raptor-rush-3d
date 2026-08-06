@@ -22,7 +22,6 @@ const fs = require('fs');
   const assets = await page.evaluate(() => window.__RAPTOR_GAME__.assets);
   assert(assets.atlas?.width > 0, 'obstacle atlas failed to load');
   assert(assets.player?.width > 0, 'player atlas failed to load');
-  assert.deepEqual(assets.pteroSheet, { width: 1152, height: 256 });
 
   const rules = await page.evaluate(() => window.__RAPTOR_GAME__.rules);
   assert.equal(rules.trex.action, 'side');
@@ -147,9 +146,9 @@ const fs = require('fs');
   const nearPtero = await page.evaluate(() => window.__RAPTOR_GAME__.visual.ptero);
   assert(nearPtero, 'close Pteranodon was not rendered');
   assert(nearPtero.bottomClearance >= 200, `Pteranodon is still too close to the ground: ${nearPtero.bottomClearance}px`);
-  assert.equal(nearPtero.frame, 'sheet-crossfade');
-  assert.equal(nearPtero.source, 'pteroSheet');
-  assert.equal(nearPtero.frames.length, 2);
+  assert.equal(nearPtero.frame, 'procedural-flight');
+  assert.equal(nearPtero.source, 'vector-pteranodon');
+  assert.deepEqual(nearPtero.frames, ['continuous-wing-cycle']);
   assert(Math.abs(nearPtero.alphaTotal - 1) < .001, `Pteranodon opacity gap: ${nearPtero.alphaTotal}`);
   await page.evaluate(rect => {
     const canvas = document.getElementById('game');
@@ -191,9 +190,9 @@ const fs = require('fs');
     await page.waitForTimeout(55);
     const p = await page.evaluate(() => window.__RAPTOR_GAME__.visual.ptero);
     assert(p, 'Pteranodon disappeared during its approach');
-    assert.equal(p.frame, 'sheet-crossfade');
-    assert.equal(p.source, 'pteroSheet');
-    assert.equal(p.frames.length, 2);
+    assert.equal(p.frame, 'procedural-flight');
+    assert.equal(p.source, 'vector-pteranodon');
+    assert.deepEqual(p.frames, ['continuous-wing-cycle']);
     assert(Math.abs(p.alphaTotal - 1) < .001, `Pteranodon opacity gap: ${p.alphaTotal}`);
     pteroMixes.push(p.mix);
   }
