@@ -18,6 +18,20 @@ jobs:
       - name: Validate JavaScript
         run: node --check game.js
 
+      - name: Prepare unobstructed screenshot captures
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('qa/gameplay-readability-test.js')
+          text = path.read_text()
+          old = "await page.evaluate(() => window.__RAPTOR_GAME__.pause());"
+          new = "await page.evaluate(() => { window.__RAPTOR_GAME__.pause(); document.getElementById('pause').classList.remove('visible'); });"
+          if text.count(old) != 3:
+              raise SystemExit(f'Expected 3 screenshot freezes, found {text.count(old)}')
+          path.write_text(text.replace(old, new))
+          PY
+
       - name: Install Playwright
         run: |
           npm init -y >/dev/null 2>&1
