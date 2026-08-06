@@ -1,0 +1,47 @@
+name: Gameplay readability QA
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-gameplay-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tested revision
+        uses: actions/checkout@v6
+
+      - name: Validate JavaScript
+        run: node --check game.js
+
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --silent playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Run full mobile gameplay audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa
+          python3 -m http.server 8000 >/tmp/readability-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          node qa/gameplay-readability-test.js
+
+      - name: Upload gameplay evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gameplay-readability-evidence
+          path: |
+            qa/readability-jump-obstacles.png
+            qa/readability-side-hazards.png
+            qa/readability-pteranodon.png
+            qa/gameplay-readability-report.json
+            /tmp/readability-http.log
