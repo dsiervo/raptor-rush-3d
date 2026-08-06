@@ -1,0 +1,44 @@
+name: Apply gameplay readability patch
+
+on:
+  push:
+    branches:
+      - gameplay-readability-audit
+    paths:
+      - .readability-ready
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout audit branch
+        uses: actions/checkout@v6
+        with:
+          ref: gameplay-readability-audit
+          fetch-depth: 0
+
+      - name: Apply and validate patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/apply-gameplay-readability.py
+          node --check game.js
+          grep -q "20260806-readability1" game.js
+          grep -q "smooth-blend" game.js
+          grep -q "procedural-single-source" game.js
+
+      - name: Commit audited game build
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .readability-ready
+          rm -f scripts/apply-gameplay-readability.py
+          rm -f .github/workflows/apply-gameplay-readability.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Improve obstacle readability and dinosaur consistency"
+          git push origin HEAD:gameplay-readability-audit
