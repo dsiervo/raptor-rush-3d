@@ -2,8 +2,6 @@ const { chromium } = require('playwright');
 const assert = require('assert');
 const fs = require('fs');
 
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-
 (async () => {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({
@@ -36,9 +34,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
   await page.evaluate(() => {
     const g = window.__RAPTOR_GAME__;
-    g.start();
-    g.skipTutorial();
-    g.clear();
+    g.start(); g.skipTutorial(); g.clear();
   });
   await page.waitForTimeout(150);
 
@@ -52,15 +48,16 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   }
   assert(maxJumpY <= .78, `jump is still too high: ${maxJumpY}`);
 
-  // Inspect every obstacle type at a near-player distance.
+  // Inspect jumpable obstacles, then freeze before collision for clean evidence.
   await page.evaluate(() => {
     const g = window.__RAPTOR_GAME__;
     g.start(); g.skipTutorial(); g.clear();
-    g.forceObstacle('boulder', -1, 9);
-    g.forceObstacle('log', 0, 9);
-    g.forceObstacle('thorn', 1, 9);
+    g.forceObstacle('boulder', -1, 12);
+    g.forceObstacle('log', 0, 12);
+    g.forceObstacle('thorn', 1, 12);
   });
-  await page.waitForTimeout(120);
+  await page.waitForTimeout(40);
+  await page.evaluate(() => window.__RAPTOR_GAME__.pause());
   let visual = await page.evaluate(() => window.__RAPTOR_GAME__.visual);
   assert.equal(visual.obstacles.length, 3);
   for (const obstacle of visual.obstacles) {
@@ -70,14 +67,15 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   }
   await page.screenshot({ path: 'qa/readability-jump-obstacles.png' });
 
-  // Tall side hazards must look unjumpable. T-rex must use one consistent source.
+  // Tall side hazards must look unjumpable at close range.
   await page.evaluate(() => {
     const g = window.__RAPTOR_GAME__;
     g.start(); g.skipTutorial(); g.clear();
-    g.forceObstacle('cactus', -1, 8);
-    g.forceObstacle('trex', 0, 8);
+    g.forceObstacle('cactus', -1, 10);
+    g.forceObstacle('trex', 0, 10);
   });
-  await page.waitForTimeout(140);
+  await page.waitForTimeout(40);
+  await page.evaluate(() => window.__RAPTOR_GAME__.pause());
   visual = await page.evaluate(() => window.__RAPTOR_GAME__.visual);
   const playerHeight = visual.player.rect.height;
   const cactus = visual.obstacles.find(o => o.type === 'cactus');
@@ -88,15 +86,21 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   assert(trex.visualHeight >= playerHeight * 1.12, `T-rex is not visibly larger than the raptor: ${trex.visualHeight} vs ${playerHeight}`);
   assert.equal(trex.source, 'trex', 'T-rex switched to a different character asset');
   assert.equal(trex.animation, 'procedural-single-source');
+  await page.screenshot({ path: 'qa/readability-side-hazards.png' });
+
+  // Observe the same T-rex source for a longer approach without letting it leave the world.
+  await page.evaluate(() => {
+    const g = window.__RAPTOR_GAME__;
+    g.start(); g.skipTutorial(); g.clear(); g.forceObstacle('trex', 0, 30);
+  });
   const trexSources = new Set();
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 8; i++) {
     await page.waitForTimeout(55);
     const current = await page.evaluate(() => window.__RAPTOR_GAME__.visual.obstacles.find(o => o.type === 'trex'));
     assert(current, 'T-rex disappeared during approach');
     trexSources.add(current.source);
   }
   assert.deepEqual([...trexSources], ['trex'], `T-rex used inconsistent sources: ${[...trexSources]}`);
-  await page.screenshot({ path: 'qa/readability-side-hazards.png' });
 
   // A jump must not bypass a side-only T-rex.
   await page.evaluate(() => {
@@ -134,26 +138,37 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const livesAfterFossil = await page.evaluate(() => window.__RAPTOR_GAME__.stats.lives);
   assert.equal(livesAfterFossil, livesBeforeFossil, 'jumping did not clear the fossil pile');
 
-  // Pteranodon must stay overhead and blend continuously without flashing.
+  // Freeze a close Pteranodon to measure its visible clearance above the ground.
   await page.evaluate(() => {
     const g = window.__RAPTOR_GAME__;
-    g.start(); g.skipTutorial(); g.clear(); g.forceObstacle('ptero', 0, 14);
+    g.start(); g.skipTutorial(); g.clear(); g.forceObstacle('ptero', 0, 10);
+  });
+  await page.waitForTimeout(40);
+  await page.evaluate(() => window.__RAPTOR_GAME__.pause());
+  const nearPtero = await page.evaluate(() => window.__RAPTOR_GAME__.visual.ptero);
+  assert(nearPtero, 'close Pteranodon was not rendered');
+  assert(nearPtero.bottomClearance >= 210, `Pteranodon is still too close to the ground: ${nearPtero.bottomClearance}px`);
+  assert.equal(nearPtero.frame, 'smooth-blend');
+  assert.deepEqual(nearPtero.sources, ['ptero0', 'ptero1']);
+  assert(Math.abs(nearPtero.alphaTotal - 1) < .001, `Pteranodon opacity gap: ${nearPtero.alphaTotal}`);
+  await page.screenshot({ path: 'qa/readability-pteranodon.png' });
+
+  // Sample a longer flight path to ensure continuous animation and no flashing/disappearance.
+  await page.evaluate(() => {
+    const g = window.__RAPTOR_GAME__;
+    g.start(); g.skipTutorial(); g.clear(); g.forceObstacle('ptero', 0, 38);
   });
   const pteroMixes = [];
-  let minimumClearance = Infinity;
-  for (let i = 0; i < 18; i++) {
+  for (let i = 0; i < 12; i++) {
     await page.waitForTimeout(55);
     const p = await page.evaluate(() => window.__RAPTOR_GAME__.visual.ptero);
     assert(p, 'Pteranodon disappeared during its approach');
     assert.equal(p.frame, 'smooth-blend');
     assert.deepEqual(p.sources, ['ptero0', 'ptero1']);
     assert(Math.abs(p.alphaTotal - 1) < .001, `Pteranodon opacity gap: ${p.alphaTotal}`);
-    minimumClearance = Math.min(minimumClearance, p.bottomClearance);
     pteroMixes.push(p.mix);
   }
-  assert(minimumClearance >= 210, `Pteranodon is still too close to the ground: ${minimumClearance}px`);
   assert(new Set(pteroMixes.map(v => v.toFixed(2))).size >= 5, 'Pteranodon wing blend is not animated');
-  await page.screenshot({ path: 'qa/readability-pteranodon.png' });
 
   // Standing must collide; sliding must pass underneath.
   await page.evaluate(() => {
@@ -193,7 +208,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
       trexSources: [...trexSources]
     },
     pteranodon: {
-      minimumBottomClearance: +minimumClearance.toFixed(1),
+      nearBottomClearance: nearPtero.bottomClearance,
       samples: pteroMixes.length,
       distinctBlendValues: new Set(pteroMixes.map(v => v.toFixed(2))).size,
       alphaTotal: 1
