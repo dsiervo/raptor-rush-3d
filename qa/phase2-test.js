@@ -50,11 +50,12 @@ const fs = require('fs');
 
   await page.evaluate(() => {
     window.__RAPTOR_GAME__.clear();
-    window.__RAPTOR_GAME__.forceObstacle('boulder', -1, 10);
-    window.__RAPTOR_GAME__.forceObstacle('log', 0, 10);
-    window.__RAPTOR_GAME__.forceObstacle('thorn', 1, 10);
+    window.__RAPTOR_GAME__.forceObstacle('boulder', -1, 12);
+    window.__RAPTOR_GAME__.forceObstacle('log', 0, 12);
+    window.__RAPTOR_GAME__.forceObstacle('thorn', 1, 12);
   });
-  await page.waitForTimeout(140);
+  await page.waitForTimeout(40);
+  await page.evaluate(() => window.__RAPTOR_GAME__.pause());
   visual = await page.evaluate(() => window.__RAPTOR_GAME__.visual);
   assert.equal(visual.obstacles.length, 3, `expected 3 obstacles, got ${visual.obstacles.length}`);
   const obstacleRatios = [];
@@ -66,6 +67,8 @@ const fs = require('fs');
   }
 
   await page.evaluate(() => {
+    window.__RAPTOR_GAME__.start();
+    window.__RAPTOR_GAME__.skipTutorial();
     window.__RAPTOR_GAME__.clear();
     window.__RAPTOR_GAME__.jump();
   });
@@ -81,24 +84,36 @@ const fs = require('fs');
   assert(jumpPixels <= 140, `rendered jump displacement is too high: ${jumpPixels}`);
   await page.waitForFunction(() => window.__RAPTOR_GAME__.stats.y === 0, null, { timeout: 2000 });
 
+  // Validate smooth Pteranodon blending over a full approach.
   await page.evaluate(() => {
     window.__RAPTOR_GAME__.clear();
-    window.__RAPTOR_GAME__.forceObstacle('ptero', 0, 18);
+    window.__RAPTOR_GAME__.forceObstacle('ptero', 0, 38);
   });
-  const pteroFrames = new Set();
+  const pteroMixes = [];
   let ptero;
-  let minClearance = Infinity;
-  for (let i = 0; i < 8; i++) {
-    await page.waitForTimeout(60);
+  for (let i = 0; i < 10; i++) {
+    await page.waitForTimeout(55);
     ptero = await page.evaluate(() => window.__RAPTOR_GAME__.visual.ptero);
-    assert(ptero, 'pteranodon was not rendered while approaching the player');
-    pteroFrames.add(ptero.frame);
-    minClearance = Math.min(minClearance, ptero.clearance);
-    assert(ptero.clearance >= 145, `pteranodon appears too close to the ground: ${JSON.stringify(ptero)}`);
-    assert(ptero.rect.y + ptero.rect.height <= ptero.groundY - 145, `pteranodon sprite reaches the ground plane: ${JSON.stringify(ptero)}`);
+    assert(ptero, 'Pteranodon was not rendered while approaching the player');
+    assert.equal(ptero.frame, 'smooth-blend');
+    assert.deepEqual(ptero.sources, ['ptero0', 'ptero1']);
+    assert(Math.abs(ptero.alphaTotal - 1) < .001, `Pteranodon opacity gap: ${ptero.alphaTotal}`);
+    pteroMixes.push(ptero.mix);
   }
-  assert(pteroFrames.size >= 3, `pteranodon animation showed only: ${[...pteroFrames]}`);
-  assert(![...pteroFrames].some(frame => frame === 'ptero_up' || frame === 'ptero_mid'), `old vertical pteranodon frames remain: ${[...pteroFrames]}`);
+  assert(new Set(pteroMixes.map(v => v.toFixed(2))).size >= 5, 'Pteranodon blend did not animate');
+
+  // Measure close-range clearance separately and freeze before collision.
+  await page.evaluate(() => {
+    window.__RAPTOR_GAME__.start();
+    window.__RAPTOR_GAME__.skipTutorial();
+    window.__RAPTOR_GAME__.clear();
+    window.__RAPTOR_GAME__.forceObstacle('ptero', 0, 10);
+  });
+  await page.waitForTimeout(40);
+  await page.evaluate(() => window.__RAPTOR_GAME__.pause());
+  ptero = await page.evaluate(() => window.__RAPTOR_GAME__.visual.ptero);
+  assert(ptero, 'close Pteranodon was not rendered');
+  assert(ptero.bottomClearance >= 210, `Pteranodon appears too close to the ground: ${JSON.stringify(ptero)}`);
 
   await page.screenshot({ path: 'qa/phase2-mobile.png' });
   assert.equal(errors.length, 0, errors.join('\n'));
@@ -118,8 +133,11 @@ const fs = require('fs');
       displacementPx: +jumpPixels.toFixed(1)
     },
     pteranodon: {
-      frames: [...pteroFrames],
-      minimumClearance: minClearance,
+      mode: ptero.frame,
+      sources: ptero.sources,
+      minimumBottomClearance: ptero.bottomClearance,
+      distinctBlendValues: new Set(pteroMixes.map(v => v.toFixed(2))).size,
+      alphaTotal: ptero.alphaTotal,
       groundY: ptero.groundY,
       centerY: ptero.centerY
     },
