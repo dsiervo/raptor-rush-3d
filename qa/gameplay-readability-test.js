@@ -1,0 +1,216 @@
+const { chromium } = require('playwright');
+const assert = require('assert');
+const fs = require('fs');
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+(async () => {
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true
+  });
+  const errors = [];
+  page.on('pageerror', error => errors.push(String(error)));
+  page.on('console', message => {
+    if (message.type() === 'error') errors.push(message.text());
+  });
+
+  await page.goto('http://127.0.0.1:8000', { waitUntil: 'networkidle' });
+  await page.waitForFunction(() => window.__RAPTOR_GAME__?.state === 'home');
+
+  const assets = await page.evaluate(() => window.__RAPTOR_GAME__.assets);
+  assert(assets.atlas?.width > 0, 'obstacle atlas failed to load');
+  assert(assets.player?.width > 0, 'player atlas failed to load');
+  assert.deepEqual(assets.ptero0, { width: 512, height: 384 });
+  assert.deepEqual(assets.ptero1, { width: 512, height: 384 });
+
+  const rules = await page.evaluate(() => window.__RAPTOR_GAME__.rules);
+  assert.equal(rules.trex.action, 'side');
+  assert.equal(rules.cactus.action, 'side');
+  assert.equal(rules.ptero.action, 'down');
+  assert.equal(rules.fossil.action, 'up', 'low fossil pile should be jumpable, not a side-only blocker');
+  for (const type of ['boulder', 'log', 'thorn', 'fossil']) assert.equal(rules[type].action, 'up');
+
+  await page.evaluate(() => {
+    const g = window.__RAPTOR_GAME__;
+    g.start();
+    g.skipTutorial();
+    g.clear();
+  });
+  await page.waitForTimeout(150);
+
+  // Measure the real jump arc.
+  await page.evaluate(() => window.__RAPTOR_GAME__.jump());
+  let maxJumpY = 0;
+  for (let i = 0; i < 30; i++) {
+    await page.waitForTimeout(25);
+    const y = await page.evaluate(() => window.__RAPTOR_GAME__.stats.y);
+    maxJumpY = Math.max(maxJumpY, y);
+  }
+  assert(maxJumpY <= .78, `jump is still too high: ${maxJumpY}`);
+
+  // Inspect every obstacle type at a near-player distance.
+  await page.evaluate(() => {
+    const g = window.__RAPTOR_GAME__;
+    g.start(); g.skipTutorial(); g.clear();
+    g.forceObstacle('boulder', -1, 9);
+    g.forceObstacle('log', 0, 9);
+    g.forceObstacle('thorn', 1, 9);
+  });
+  await page.waitForTimeout(120);
+  let visual = await page.evaluate(() => window.__RAPTOR_GAME__.visual);
+  assert.equal(visual.obstacles.length, 3);
+  for (const obstacle of visual.obstacles) {
+    assert(obstacle.rect.x >= -3, `${obstacle.type} starts outside viewport`);
+    assert(obstacle.rect.x + obstacle.rect.width <= 393, `${obstacle.type} ends outside viewport`);
+    assert(obstacle.ratio <= 1.03, `${obstacle.type} is too wide for its lane`);
+  }
+  await page.screenshot({ path: 'qa/readability-jump-obstacles.png' });
+
+  // Tall side hazards must look unjumpable. T-rex must use one consistent source.
+  await page.evaluate(() => {
+    const g = window.__RAPTOR_GAME__;
+    g.start(); g.skipTutorial(); g.clear();
+    g.forceObstacle('cactus', -1, 8);
+    g.forceObstacle('trex', 0, 8);
+  });
+  await page.waitForTimeout(140);
+  visual = await page.evaluate(() => window.__RAPTOR_GAME__.visual);
+  const playerHeight = visual.player.rect.height;
+  const cactus = visual.obstacles.find(o => o.type === 'cactus');
+  const trex = visual.obstacles.find(o => o.type === 'trex');
+  assert(cactus && trex, 'side hazards were not rendered');
+  assert(cactus.action === 'side' && trex.action === 'side');
+  assert(cactus.visualHeight >= 145, `cactus still looks jumpable: ${cactus.visualHeight}px`);
+  assert(trex.visualHeight >= playerHeight * 1.12, `T-rex is not visibly larger than the raptor: ${trex.visualHeight} vs ${playerHeight}`);
+  assert.equal(trex.source, 'trex', 'T-rex switched to a different character asset');
+  assert.equal(trex.animation, 'procedural-single-source');
+  const trexSources = new Set();
+  for (let i = 0; i < 10; i++) {
+    await page.waitForTimeout(55);
+    const current = await page.evaluate(() => window.__RAPTOR_GAME__.visual.obstacles.find(o => o.type === 'trex'));
+    assert(current, 'T-rex disappeared during approach');
+    trexSources.add(current.source);
+  }
+  assert.deepEqual([...trexSources], ['trex'], `T-rex used inconsistent sources: ${[...trexSources]}`);
+  await page.screenshot({ path: 'qa/readability-side-hazards.png' });
+
+  // A jump must not bypass a side-only T-rex.
+  await page.evaluate(() => {
+    const g = window.__RAPTOR_GAME__;
+    g.start(); g.skipTutorial(); g.clear(); g.jump();
+  });
+  await page.waitForFunction(() => window.__RAPTOR_GAME__.stats.y > .52);
+  const livesBeforeTrexJump = await page.evaluate(() => window.__RAPTOR_GAME__.stats.lives);
+  await page.evaluate(() => window.__RAPTOR_GAME__.forceObstacle('trex', 0, 4));
+  await page.waitForTimeout(130);
+  const livesAfterTrexJump = await page.evaluate(() => window.__RAPTOR_GAME__.stats.lives);
+  assert.equal(livesAfterTrexJump, livesBeforeTrexJump - 1, 'jumping incorrectly avoided the T-rex');
+
+  // Moving sideways must avoid it.
+  await page.evaluate(() => {
+    const g = window.__RAPTOR_GAME__;
+    g.start(); g.skipTutorial(); g.clear(); g.right();
+  });
+  await page.waitForTimeout(180);
+  const livesBeforeDodge = await page.evaluate(() => window.__RAPTOR_GAME__.stats.lives);
+  await page.evaluate(() => window.__RAPTOR_GAME__.forceObstacle('trex', 0, 4));
+  await page.waitForTimeout(130);
+  const livesAfterDodge = await page.evaluate(() => window.__RAPTOR_GAME__.stats.lives);
+  assert.equal(livesAfterDodge, livesBeforeDodge, 'sideways dodge did not avoid the T-rex');
+
+  // The fossil now matches its low silhouette and can be jumped.
+  await page.evaluate(() => {
+    const g = window.__RAPTOR_GAME__;
+    g.start(); g.skipTutorial(); g.clear(); g.jump();
+  });
+  await page.waitForFunction(() => window.__RAPTOR_GAME__.stats.y > .52);
+  const livesBeforeFossil = await page.evaluate(() => window.__RAPTOR_GAME__.stats.lives);
+  await page.evaluate(() => window.__RAPTOR_GAME__.forceObstacle('fossil', 0, 4));
+  await page.waitForTimeout(130);
+  const livesAfterFossil = await page.evaluate(() => window.__RAPTOR_GAME__.stats.lives);
+  assert.equal(livesAfterFossil, livesBeforeFossil, 'jumping did not clear the fossil pile');
+
+  // Pteranodon must stay overhead and blend continuously without flashing.
+  await page.evaluate(() => {
+    const g = window.__RAPTOR_GAME__;
+    g.start(); g.skipTutorial(); g.clear(); g.forceObstacle('ptero', 0, 14);
+  });
+  const pteroMixes = [];
+  let minimumClearance = Infinity;
+  for (let i = 0; i < 18; i++) {
+    await page.waitForTimeout(55);
+    const p = await page.evaluate(() => window.__RAPTOR_GAME__.visual.ptero);
+    assert(p, 'Pteranodon disappeared during its approach');
+    assert.equal(p.frame, 'smooth-blend');
+    assert.deepEqual(p.sources, ['ptero0', 'ptero1']);
+    assert(Math.abs(p.alphaTotal - 1) < .001, `Pteranodon opacity gap: ${p.alphaTotal}`);
+    minimumClearance = Math.min(minimumClearance, p.bottomClearance);
+    pteroMixes.push(p.mix);
+  }
+  assert(minimumClearance >= 210, `Pteranodon is still too close to the ground: ${minimumClearance}px`);
+  assert(new Set(pteroMixes.map(v => v.toFixed(2))).size >= 5, 'Pteranodon wing blend is not animated');
+  await page.screenshot({ path: 'qa/readability-pteranodon.png' });
+
+  // Standing must collide; sliding must pass underneath.
+  await page.evaluate(() => {
+    const g = window.__RAPTOR_GAME__;
+    g.start(); g.skipTutorial(); g.clear();
+  });
+  const livesBeforePtero = await page.evaluate(() => window.__RAPTOR_GAME__.stats.lives);
+  await page.evaluate(() => window.__RAPTOR_GAME__.forceObstacle('ptero', 0, 4));
+  await page.waitForTimeout(130);
+  const livesAfterPtero = await page.evaluate(() => window.__RAPTOR_GAME__.stats.lives);
+  assert.equal(livesAfterPtero, livesBeforePtero - 1, 'standing incorrectly passed under the Pteranodon');
+
+  await page.evaluate(() => {
+    const g = window.__RAPTOR_GAME__;
+    g.start(); g.skipTutorial(); g.clear(); g.slide(); g.forceObstacle('ptero', 0, 4);
+  });
+  await page.waitForTimeout(130);
+  assert.equal(await page.evaluate(() => window.__RAPTOR_GAME__.stats.lives), 5, 'sliding did not avoid the Pteranodon');
+
+  // Victory path still works after the visual changes.
+  await page.evaluate(() => {
+    const g = window.__RAPTOR_GAME__;
+    g.clear(); g.forceGoal();
+  });
+  await page.waitForFunction(() => window.__RAPTOR_GAME__.state === 'won');
+
+  assert.equal(errors.length, 0, errors.join('\n'));
+  const report = {
+    viewport: '390x844@2x',
+    assets,
+    rules,
+    jump: { maxY: +maxJumpY.toFixed(3) },
+    sideHazards: {
+      cactusHeight: cactus.visualHeight,
+      trexHeight: trex.visualHeight,
+      playerHeight: +playerHeight.toFixed(1),
+      trexSources: [...trexSources]
+    },
+    pteranodon: {
+      minimumBottomClearance: +minimumClearance.toFixed(1),
+      samples: pteroMixes.length,
+      distinctBlendValues: new Set(pteroMixes.map(v => v.toFixed(2))).size,
+      alphaTotal: 1
+    },
+    collisionSemantics: {
+      trexCannotBeJumped: true,
+      trexCanBeDodgedSideways: true,
+      fossilCanBeJumped: true,
+      pteranodonRequiresSlide: true
+    },
+    victory: true,
+    errors: 0
+  };
+  fs.writeFileSync('qa/gameplay-readability-report.json', `${JSON.stringify(report, null, 2)}\n`);
+  console.log(JSON.stringify(report));
+  await browser.close();
+})().catch(error => {
+  console.error(error);
+  process.exit(1);
+});
