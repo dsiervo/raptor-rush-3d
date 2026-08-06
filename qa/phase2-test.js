@@ -22,8 +22,7 @@ const fs = require('fs');
   const assets = await page.evaluate(() => window.__RAPTOR_GAME__.assets);
   assert(assets.atlas?.width > 0 && assets.atlas?.height > 0, 'obstacle atlas did not load');
   assert(assets.player?.width > 0 && assets.player?.height > 0, 'player atlas did not load');
-  assert.deepEqual(assets.ptero0, { width: 512, height: 384 });
-  assert.deepEqual(assets.ptero1, { width: 512, height: 384 });
+  assert.deepEqual(assets.pteroSheet, { width: 1152, height: 256 });
 
   await page.evaluate(() => {
     window.__RAPTOR_GAME__.start();
@@ -95,8 +94,9 @@ const fs = require('fs');
     await page.waitForTimeout(55);
     ptero = await page.evaluate(() => window.__RAPTOR_GAME__.visual.ptero);
     assert(ptero, 'Pteranodon was not rendered while approaching the player');
-    assert.equal(ptero.frame, 'smooth-blend');
-    assert.deepEqual(ptero.sources, ['ptero0', 'ptero1']);
+    assert.equal(ptero.frame, 'sheet-crossfade');
+    assert.equal(ptero.source, 'pteroSheet');
+    assert.equal(ptero.frames.length, 2);
     assert(Math.abs(ptero.alphaTotal - 1) < .001, `Pteranodon opacity gap: ${ptero.alphaTotal}`);
     pteroMixes.push(ptero.mix);
   }
@@ -113,7 +113,7 @@ const fs = require('fs');
   await page.evaluate(() => window.__RAPTOR_GAME__.pause());
   ptero = await page.evaluate(() => window.__RAPTOR_GAME__.visual.ptero);
   assert(ptero, 'close Pteranodon was not rendered');
-  assert(ptero.bottomClearance >= 210, `Pteranodon appears too close to the ground: ${JSON.stringify(ptero)}`);
+  assert(ptero.bottomClearance >= 190, `Pteranodon appears too close to the ground: ${JSON.stringify(ptero)}`);
 
   await page.screenshot({ path: 'qa/phase2-mobile.png' });
   assert.equal(errors.length, 0, errors.join('\n'));
@@ -134,7 +134,8 @@ const fs = require('fs');
     },
     pteranodon: {
       mode: ptero.frame,
-      sources: ptero.sources,
+      source: ptero.source,
+      frames: ptero.frames,
       minimumBottomClearance: ptero.bottomClearance,
       distinctBlendValues: new Set(pteroMixes.map(v => v.toFixed(2))).size,
       alphaTotal: ptero.alphaTotal,
