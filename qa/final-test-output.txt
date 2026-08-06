@@ -1,0 +1,9 @@
+AssertionError [ERR_ASSERTION]: Pteranodon is not visibly rendered: {"changedPixels":0,"totalDifference":0}
+    at /home/runner/work/raptor-rush-3d/raptor-rush-3d/qa/gameplay-readability-test.js:181:3 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
