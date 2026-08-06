@@ -146,7 +146,7 @@ const fs = require('fs');
   await page.evaluate(() => window.__RAPTOR_GAME__.pause());
   const nearPtero = await page.evaluate(() => window.__RAPTOR_GAME__.visual.ptero);
   assert(nearPtero, 'close Pteranodon was not rendered');
-  assert(nearPtero.bottomClearance >= 190, `Pteranodon is still too close to the ground: ${nearPtero.bottomClearance}px`);
+  assert(nearPtero.bottomClearance >= 200, `Pteranodon is still too close to the ground: ${nearPtero.bottomClearance}px`);
   assert.equal(nearPtero.frame, 'sheet-crossfade');
   assert.equal(nearPtero.source, 'pteroSheet');
   assert.equal(nearPtero.frames.length, 2);

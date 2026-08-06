@@ -113,7 +113,7 @@ const fs = require('fs');
   await page.evaluate(() => window.__RAPTOR_GAME__.pause());
   ptero = await page.evaluate(() => window.__RAPTOR_GAME__.visual.ptero);
   assert(ptero, 'close Pteranodon was not rendered');
-  assert(ptero.bottomClearance >= 190, `Pteranodon appears too close to the ground: ${JSON.stringify(ptero)}`);
+  assert(ptero.bottomClearance >= 200, `Pteranodon appears too close to the ground: ${JSON.stringify(ptero)}`);
 
   await page.screenshot({ path: 'qa/phase2-mobile.png' });
   assert.equal(errors.length, 0, errors.join('\n'));
