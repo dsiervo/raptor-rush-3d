@@ -1,20 +1,15 @@
-name: Test Phase 2 visuals
+name: Gameplay readability QA
 
 on:
   pull_request:
     branches:
       - main
-  push:
-    branches:
-      - phase2-visual-fix
-    paths:
-      - .phase2-ready
 
 permissions:
   contents: read
 
 jobs:
-  mobile-visual-qa:
+  mobile-gameplay-audit:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout tested revision
@@ -23,17 +18,17 @@ jobs:
       - name: Validate JavaScript
         run: node --check game.js
 
-      - name: Prepare unobstructed screenshot capture
+      - name: Prepare unobstructed screenshot captures
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          path = Path('qa/phase2-test.js')
+          path = Path('qa/gameplay-readability-test.js')
           text = path.read_text()
           old = "await page.evaluate(() => window.__RAPTOR_GAME__.pause());"
           new = "await page.evaluate(() => { window.__RAPTOR_GAME__.pause(); document.getElementById('pause').classList.remove('visible'); });"
-          if text.count(old) != 2:
-              raise SystemExit(f'Expected 2 screenshot freezes, found {text.count(old)}')
+          if text.count(old) != 3:
+              raise SystemExit(f'Expected 3 screenshot freezes, found {text.count(old)}')
           path.write_text(text.replace(old, new))
           PY
 
@@ -43,21 +38,24 @@ jobs:
           npm install --silent playwright@1.55.0
           npx playwright install --with-deps chromium
 
-      - name: Run mobile visual QA
+      - name: Run full mobile gameplay audit
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m http.server 8000 >/tmp/phase2-http.log 2>&1 &
+          mkdir -p qa
+          python3 -m http.server 8000 >/tmp/readability-http.log 2>&1 &
           SERVER_PID=$!
           trap 'kill $SERVER_PID || true' EXIT
-          node qa/phase2-test.js
+          node qa/gameplay-readability-test.js
 
-      - name: Upload QA evidence
+      - name: Upload gameplay evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase2-mobile-qa
+          name: gameplay-readability-evidence
           path: |
-            qa/phase2-mobile.png
-            qa/phase2-report.json
-            /tmp/phase2-http.log
+            qa/readability-jump-obstacles.png
+            qa/readability-side-hazards.png
+            qa/readability-pteranodon.png
+            qa/gameplay-readability-report.json
+            /tmp/readability-http.log

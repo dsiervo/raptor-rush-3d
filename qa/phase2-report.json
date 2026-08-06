@@ -1,21 +1,13 @@
 {
   "viewport": "390x844@2x",
   "assets": {
-    "atlas": {
-      "width": 627,
-      "height": 848
-    },
-    "ptero1": {
-      "width": 512,
-      "height": 384
-    },
-    "ptero0": {
-      "width": 512,
-      "height": 384
-    },
     "player": {
       "width": 639,
       "height": 639
+    },
+    "atlas": {
+      "width": 627,
+      "height": 848
     }
   },
   "background": {
@@ -36,11 +28,11 @@
       195,
       322.4
     ],
-    "dashOffset": -38.23,
+    "dashOffset": -2.67,
     "dashDirection": "toward-player",
     "testedOffsets": [
       -6.94,
-      -12.82
+      -12.27
     ]
   },
   "obstacleRatios": [
@@ -58,18 +50,20 @@
     }
   ],
   "jump": {
-    "maxY": 0.73,
-    "displacementPx": 110.9
+    "maxY": 0.72,
+    "displacementPx": 109.4
   },
   "pteranodon": {
+    "mode": "procedural-flight",
+    "source": "vector-pteranodon",
     "frames": [
-      "ptero_glide",
-      "ptero1",
-      "ptero0"
+      "continuous-wing-cycle"
     ],
-    "minimumClearance": 160,
-    "groundY": 797.6,
-    "centerY": 571.2
+    "minimumBottomClearance": 239,
+    "distinctBlendValues": 10,
+    "alphaTotal": 1,
+    "groundY": 741.7,
+    "centerY": 469.5
   },
   "errors": 0
 }
