@@ -79,7 +79,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TESTED_SHA=$(git rev-parse HEAD)
+          TESTED_SHA="$GITHUB_SHA"
           mkdir -p qa
           cp /tmp/final-test-output.log qa/final-test-output.txt || true
           rm -f .final-qa-passed .final-qa-failed
@@ -92,7 +92,12 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A .final-qa-passed .final-qa-failed qa/final-test-output.txt qa/readability-jump-obstacles.png qa/readability-side-hazards.png qa/readability-pteranodon.png qa/gameplay-readability-report.json qa/phase2-mobile.png qa/phase2-report.json 2>/dev/null || true
+          if [[ -f .final-qa-passed ]]; then git add .final-qa-passed; fi
+          if [[ -f .final-qa-failed ]]; then git add .final-qa-failed; fi
+          git add qa/final-test-output.txt
+          for file in qa/readability-jump-obstacles.png qa/readability-side-hazards.png qa/readability-pteranodon.png qa/gameplay-readability-report.json qa/phase2-mobile.png qa/phase2-report.json; do
+            if [[ -f "$file" ]]; then git add "$file"; fi
+          done
           git commit -m "$COMMIT_MESSAGE"
           git push origin HEAD:gameplay-readability-audit
 
