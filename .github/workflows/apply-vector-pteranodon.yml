@@ -1,0 +1,42 @@
+name: Apply vector Pteranodon
+
+on:
+  push:
+    branches:
+      - gameplay-readability-audit
+    paths:
+      - .vector-ptero-ready
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout audit branch
+        uses: actions/checkout@v6
+        with:
+          ref: gameplay-readability-audit
+          fetch-depth: 0
+
+      - name: Replace Pteranodon renderer
+        run: |
+          python3 scripts/apply-vector-pteranodon.py
+          node --check game.js
+          grep -q "procedural-flight" game.js
+          grep -q "readability4" index.html
+          test ! -e assets/ptero-sheet-part-0.js
+
+      - name: Commit robust Pteranodon renderer
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .vector-ptero-ready
+          rm -f scripts/apply-vector-pteranodon.py
+          rm -f .github/workflows/apply-vector-pteranodon.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Replace invisible Pteranodon assets with vector flight animation"
+          git push origin HEAD:gameplay-readability-audit
