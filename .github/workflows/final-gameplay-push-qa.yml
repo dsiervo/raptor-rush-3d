@@ -50,26 +50,44 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Run both mobile gameplay suites
+        id: tests
+        continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
+          set -o pipefail
           python3 -m http.server 8000 >/tmp/final-game-http.log 2>&1 &
           SERVER_PID=$!
           trap 'kill $SERVER_PID || true' EXIT
-          node qa/gameplay-readability-test.js
-          node qa/phase2-test.js
+          {
+            node qa/gameplay-readability-test.js
+            node qa/phase2-test.js
+          } 2>&1 | tee /tmp/final-test-output.log
 
-      - name: Record successful QA evidence
+      - name: Record QA outcome and evidence
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
           TESTED_SHA=$(git rev-parse HEAD)
-          printf '%s\n' "$TESTED_SHA" > .final-qa-passed
+          mkdir -p qa
+          cp /tmp/final-test-output.log qa/final-test-output.txt || true
+          rm -f .final-qa-passed .final-qa-failed
+          if [[ "${{ steps.tests.outcome }}" == "success" ]]; then
+            printf '%s\n' "$TESTED_SHA" > .final-qa-passed
+            COMMIT_MESSAGE="Record successful final gameplay QA"
+          else
+            printf '%s\n' "$TESTED_SHA" > .final-qa-failed
+            COMMIT_MESSAGE="Record failed final gameplay QA"
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .final-qa-passed qa/readability-jump-obstacles.png qa/readability-side-hazards.png qa/readability-pteranodon.png qa/gameplay-readability-report.json qa/phase2-mobile.png qa/phase2-report.json
-          git commit -m "Record successful final gameplay QA"
+          git add -A .final-qa-passed .final-qa-failed qa/final-test-output.txt qa/readability-jump-obstacles.png qa/readability-side-hazards.png qa/readability-pteranodon.png qa/gameplay-readability-report.json qa/phase2-mobile.png qa/phase2-report.json 2>/dev/null || true
+          git commit -m "$COMMIT_MESSAGE"
           git push origin HEAD:gameplay-readability-audit
+
+      - name: Enforce test result
+        if: steps.tests.outcome != 'success'
+        run: exit 1
 
       - name: Upload final visual evidence
         if: always()
@@ -83,4 +101,5 @@ jobs:
             qa/gameplay-readability-report.json
             qa/phase2-mobile.png
             qa/phase2-report.json
+            qa/final-test-output.txt
             /tmp/final-game-http.log
