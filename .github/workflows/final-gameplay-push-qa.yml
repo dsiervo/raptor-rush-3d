@@ -1,0 +1,105 @@
+name: Final gameplay branch QA
+
+on:
+  push:
+    branches:
+      - gameplay-readability-audit
+    paths:
+      - .final-qa-ready
+
+permissions:
+  contents: write
+
+jobs:
+  full-mobile-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout final branch revision
+        uses: actions/checkout@v6
+        with:
+          ref: gameplay-readability-audit
+          fetch-depth: 0
+
+      - name: Validate production JavaScript
+        run: |
+          node --check game.js
+          node --check assets/ptero-sheet-part-0.js
+          node --check assets/ptero-sheet-part-1.js
+          node --check assets/ptero-sheet-part-2.js
+          node --check assets/ptero-sheet-part-3.js
+
+      - name: Prepare unobstructed screenshot captures
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for filename, expected in [('qa/gameplay-readability-test.js', 3), ('qa/phase2-test.js', 2)]:
+              path = Path(filename)
+              text = path.read_text()
+              old = "await page.evaluate(() => window.__RAPTOR_GAME__.pause());"
+              new = "await page.evaluate(() => { window.__RAPTOR_GAME__.pause(); document.getElementById('pause').classList.remove('visible'); });"
+              if text.count(old) != expected:
+                  raise SystemExit(f'{filename}: expected {expected} screenshot freezes, found {text.count(old)}')
+              path.write_text(text.replace(old, new))
+          PY
+
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --silent playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Run both mobile gameplay suites
+        id: tests
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 -m http.server 8000 >/tmp/final-game-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          {
+            node qa/gameplay-readability-test.js
+            node qa/phase2-test.js
+          } 2>&1 | tee /tmp/final-test-output.log
+
+      - name: Record QA outcome and evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          TESTED_SHA=$(git rev-parse HEAD)
+          mkdir -p qa
+          cp /tmp/final-test-output.log qa/final-test-output.txt || true
+          rm -f .final-qa-passed .final-qa-failed
+          if [[ "${{ steps.tests.outcome }}" == "success" ]]; then
+            printf '%s\n' "$TESTED_SHA" > .final-qa-passed
+            COMMIT_MESSAGE="Record successful final gameplay QA"
+          else
+            printf '%s\n' "$TESTED_SHA" > .final-qa-failed
+            COMMIT_MESSAGE="Record failed final gameplay QA"
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A .final-qa-passed .final-qa-failed qa/final-test-output.txt qa/readability-jump-obstacles.png qa/readability-side-hazards.png qa/readability-pteranodon.png qa/gameplay-readability-report.json qa/phase2-mobile.png qa/phase2-report.json 2>/dev/null || true
+          git commit -m "$COMMIT_MESSAGE"
+          git push origin HEAD:gameplay-readability-audit
+
+      - name: Enforce test result
+        if: steps.tests.outcome != 'success'
+        run: exit 1
+
+      - name: Upload final visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-gameplay-evidence
+          path: |
+            qa/readability-jump-obstacles.png
+            qa/readability-side-hazards.png
+            qa/readability-pteranodon.png
+            qa/gameplay-readability-report.json
+            qa/phase2-mobile.png
+            qa/phase2-report.json
+            qa/final-test-output.txt
+            /tmp/final-game-http.log
