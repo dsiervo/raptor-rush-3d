@@ -1,0 +1,47 @@
+name: Apply visible Pteranodon integration
+
+on:
+  push:
+    branches:
+      - gameplay-readability-audit
+    paths:
+      - .pteranodon-ready
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout audit branch
+        uses: actions/checkout@v6
+        with:
+          ref: gameplay-readability-audit
+          fetch-depth: 0
+
+      - name: Integrate sheet and validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/apply-visible-pteranodon.py
+          node --check game.js
+          node --check assets/ptero-sheet-part-0.js
+          node --check assets/ptero-sheet-part-1.js
+          node --check assets/ptero-sheet-part-2.js
+          node --check assets/ptero-sheet-part-3.js
+          grep -q "pteroSheet" game.js
+          grep -q "20260806-readability2" index.html
+
+      - name: Commit final visible dinosaur build
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .pteranodon-ready
+          rm -f scripts/apply-visible-pteranodon.py
+          rm -f .github/workflows/apply-visible-pteranodon.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Replace flashing Pteranodon with visible normalized flight sheet"
+          git push origin HEAD:gameplay-readability-audit
