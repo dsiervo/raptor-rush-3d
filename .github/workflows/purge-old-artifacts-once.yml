@@ -1,0 +1,26 @@
+name: Purge old Actions artifacts once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/purge-old-artifacts-once.yml'
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Delete stored artifacts older than September 13
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" --jq '.artifacts[] | select(.created_at < "2026-09-13T00:00:00Z") | .id' | while read -r id; do
+            [ -z "$id" ] && continue
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/$id"
+          done
